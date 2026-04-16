@@ -1,5 +1,4 @@
 *.tif
-*.csv
 .Rhistory
 .RData
 .Rproj.user/
