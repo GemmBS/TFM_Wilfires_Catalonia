@@ -817,5 +817,5 @@ table(wfc_consolidated$land_cover_id, useNA = "always")
 ```
 
 
-MODEL D'ELEVACIONS
+
 
