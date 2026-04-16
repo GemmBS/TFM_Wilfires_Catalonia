@@ -736,14 +736,18 @@ In this section, we integrate the Land Cover Maps of Catalonia (MCSC) from the I
 To ensure the project is portable and efficient, we will "crop" the original heavy rasters from the external drive to the study area and save them in the local `Data/` folder using LZW compression.
 
 ```{r}
-# 3. Define paths (External USB and Local Project)
+# 1. Create a spatial bounding box for cropping
+incendis_sf <- st_as_sf(wfc_consolidated, coords = c("longitude", "latitude"), crs = 4326)
+study_area_bbox <- st_as_sfc(st_bbox(incendis_sf))
+
+# 2. Define paths (External USB and Local Project)
 #usb_path <- "E:/MASTER Data science/Màster en Data Science/TFM/"
 #tif_files <- c("cobertes-sol-v1r0-2009.tif", 
 #               "cobertes-sol-v1r0-2018.tif", 
 #               "cobertes-sol-v1r0-2019-2020.tif")
 
-# 4. Process each raster: Crop and Compress
-#for (f in tif_files) {
+# 3. Process each raster: Crop and Compress
+# for (f in tif_files) {
 #  message("Processing and cropping: ", f)
   
   # Load original raster from USB
@@ -756,22 +760,11 @@ To ensure the project is portable and efficient, we will "crop" the original hea
 #  r_cropped <- crop(r_source, vect(bbox_proj))
   
   # Save locally in the Data folder with high compression
-#  writeRaster(r_cropped, here("Data", f), 
-#              gdal = c("COMPRESS=LZW", "PREDICTOR=2"), 
-#              overwrite = TRUE)
+ # writeRaster(r_cropped, here("Data", f), 
+  #            gdal = c("COMPRESS=LZW", "PREDICTOR=2"), 
+   #           overwrite = TRUE)
 #}
 ```
-
-
-```{r}
-# 1. Convert to spatial format (EPSG:4326 - WGS84)
-incendis_sf <- st_as_sf(wfc_consolidated, coords = c("longitude", "latitude"), crs = 4326)
-
-# 2. Create a bounding box to crop the rasters (saves space for Git)
-# We add a small buffer (0.1 degrees) around our fire points
-study_area <- st_bbox(incendis_sf) %>% st_as_sfc() %>% st_buffer(0.1)
-```
-
 
 
 ## 5.2 Spatial Extraction and Temporal Mapping
@@ -784,50 +777,42 @@ We now iterate through each Land Cover raster. For each file, we:
 4. Filter and assign the values to the main dataset based on the fire's year.
 
 ```{r}
-# Initialize columns for land cover
+# Initialize the target column
 wfc_consolidated$land_cover_id <- NA
 
 for (f in tif_files) {
-  message("Processing raster: ", f)
+  # Load the local cropped raster
+  r_local <- rast(here("Data", f))
   
-  # Load raster from USB
-  r_full <- rast(paste0(usb_path, f))
+  # Ensure fire points match the raster projection
+  incendis_proj <- st_transform(incendis_sf, crs(r_local))
   
-  # Project study area to Raster CRS for cropping
-  study_area_proj <- st_transform(study_area, crs(r_full))
+  # Extract pixel values for all points
+  extracted_values <- extract(r_local, vect(incendis_proj))[, 2]
   
-  # Crop and Save locally (This allows the tutor to run it without the USB)
-  r_cropped <- crop(r_full, vect(study_area_proj))
-  writeRaster(r_cropped, here("Data", f), gdal="COMPRESS=LZW", overwrite=TRUE)
-  
-  # Project fire points to Raster CRS
-  incendis_proj <- st_transform(incendis_sf, crs(r_cropped))
-  
-  # Extract values
-  extracted_values <- extract(r_cropped, vect(incendis_proj))[, 2]
-  
-  # Temporal assignment logic
+  # Assign values based on temporal windows
   if (grepl("2009", f)) {
-    # Fires from start until 2013
-    mask <- wfc_consolidated$year <= 2013
-    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+    # Early period: up to 2013
+    idx <- wfc_consolidated$year <= 2013
+    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
     
   } else if (grepl("2018", f)) {
-    # Fires from 2014 to 2018
-    mask <- wfc_consolidated$year >= 2014 & wfc_consolidated$year <= 2018
-    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+    # Mid period: 2014 to 2018
+    idx <- wfc_consolidated$year >= 2014 & wfc_consolidated$year <= 2018
+    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
     
   } else if (grepl("2019-2020", f)) {
-    # Fires from 2019 to 2022
-    mask <- wfc_consolidated$year >= 2019
-    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+    # Recent period: 2019 onwards
+    idx <- wfc_consolidated$year >= 2019
+    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
   }
 }
 
-# Save the final light-weight dataset
-nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_final_analysis.parquet"))
+# Save final lightweight dataset for the TFM analysis
+nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_consolidated_landcover.parquet"))
 
-# Final check
+# Summary of results
+print("Land Cover assignment complete. Summary of classes:")
 table(wfc_consolidated$land_cover_id, useNA = "always")
 ```
 
