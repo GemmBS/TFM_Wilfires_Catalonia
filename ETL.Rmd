@@ -744,7 +744,7 @@ study_area_bbox <- st_as_sfc(st_bbox(incendis_sf))
 #usb_path <- "E:/MASTER Data science/Màster en Data Science/TFM/"
 #tif_files <- c("cobertes-sol-v1r0-2009.tif", 
 #               "cobertes-sol-v1r0-2018.tif", 
-#               "cobertes-sol-v1r0-2019-2020.tif")
+#               "cobertes-sol-v1r0-2019-2022.tif")
 
 # 3. Process each raster: Crop and Compress
 # for (f in tif_files) {
@@ -781,41 +781,78 @@ We now iterate through each Land Cover raster. For each file, we:
 wfc_consolidated$land_cover_id <- NA
 
 for (f in tif_files) {
-  # Load the local cropped raster
-  r_local <- rast(here("Data", f))
+  # Load the local cropped raster from the Data folder
+  r_path <- here("Data", f)
   
-  # Ensure fire points match the raster projection
-  incendis_proj <- st_transform(incendis_sf, crs(r_local))
-  
-  # Extract pixel values for all points
-  extracted_values <- extract(r_local, vect(incendis_proj))[, 2]
-  
-  # Assign values based on temporal windows
-  if (grepl("2009", f)) {
-    # Early period: up to 2013
-    idx <- wfc_consolidated$year <= 2013
-    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+  if (file.exists(r_path)) {
+    message("Extracting data from: ", f)
+    r_local <- rast(r_path)
     
-  } else if (grepl("2018", f)) {
-    # Mid period: 2014 to 2018
-    idx <- wfc_consolidated$year >= 2014 & wfc_consolidated$year <= 2018
-    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+    # Ensure fire points match the raster projection
+    incendis_proj <- st_transform(incendis_sf, crs(r_local))
     
-  } else if (grepl("2019-2020", f)) {
-    # Recent period: 2019 onwards
-    idx <- wfc_consolidated$year >= 2019
-    wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+    # Extract pixel values for all points
+    # (The second column of extract() contains the actual values)
+    extracted_values <- extract(r_local, vect(incendis_proj))[, 2]
+    
+    # Assign values based on the corrected temporal windows
+    if (grepl("2009", f)) {
+      # Period: Start until 2013
+      idx <- wfc_consolidated$year <= 2013
+      wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+      
+    } else if (grepl("2018", f)) {
+      # Period: 2014 to 2018
+      idx <- wfc_consolidated$year >= 2014 & wfc_consolidated$year <= 2018
+      wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+      
+    } else if (grepl("2019-2022", f)) {
+      # Period: 2019 to 2022
+      idx <- wfc_consolidated$year >= 2019
+      wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+    }
+  } else {
+    warning("File not found in Data folder: ", f)
   }
 }
 
 # Save final lightweight dataset for the TFM analysis
 nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_consolidated_landcover.parquet"))
 
-# Summary of results
+# Summary of results to verify assignments
 print("Land Cover assignment complete. Summary of classes:")
 table(wfc_consolidated$land_cover_id, useNA = "always")
 ```
 
+```{r}
+# 1. We only focus on the file that failed before
+f_missing <- "cobertes-sol-v1r0-2019-2022.tif"
+r_path <- here("Data", f_missing)
+
+if (file.exists(r_path)) {
+  message("Final step: Extracting data for the 2019-2022 period...")
+  
+  r_local <- rast(r_path)
+  
+  # Ensure points match projection
+  incendis_proj <- st_transform(incendis_sf, crs(r_local))
+  
+  # Extract values
+  extracted_values <- extract(r_local, vect(incendis_proj))[, 2]
+  
+  # Assign only to the fires from 2019 to 2022
+  idx <- wfc_consolidated$year >= 2019 & wfc_consolidated$year <= 2022
+  wfc_consolidated$land_cover_id[idx] <- extracted_values[idx]
+  
+  # Save the definitive version
+  nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_consolidated_landcover.parquet"))
+  
+  print("Final table update:")
+  print(table(wfc_consolidated$land_cover_id, useNA = "always"))
+} else {
+  stop("Wait! The file ", f_missing, " is still not in your Data folder.")
+}
+```
 
 
 
