@@ -37,7 +37,7 @@ library(arrow)
 We start by working with the data on Catalonia Wildfires. We observe a summary to see the size and structure of our data.
 
 ```{r data import}
-ruta_fitxer <- here("Data", "WildfiresCat1968_2022.xlsx")
+ruta_fitxer <- here("Data", "WildfiresCat.xlsx")
 wfc<- read_xlsx(ruta_fitxer, sheet = 1, guess_max = 30000)
 summary(wfc)
 str(wfc)
@@ -236,7 +236,7 @@ In summary, the current dataset has been consolidated and reviewed, confirming t
 Let's continue working with the data on Spain Wildfires. We observe a summary to see the size and structure of our data.
 
 ```{r data import, warning=FALSE, message=FALSE}
-ruta_fitxer <- here("Data", "WildfiresSpain1968_2023.csv")
+ruta_fitxer <- here("Data", "WildfiresSpain.csv")
 wfs<- read_csv(ruta_fitxer, guess_max = 30000)
 summary(wfs)
 str(wfs)
@@ -727,42 +727,110 @@ glimpse(wfc_consolidated)
 # 5.LAND COVER DATASET
 ## 5.1 DATA IMPORT
 
-Cal importar totes les dades al github i fer aproximacions dels tipus de sòl segons els anys d'incendis i els anys disponibles en els tipus de sòl.
+In this section, we integrate the Land Cover Maps of Catalonia (MCSC) from the ICGC. Since we have fire records from 1998 to 2022 but land cover maps are only available for specific years (2009, 2018, and 2019-2020), we will apply a **temporal proximity join**:
+
+* **Fires (1998–2013):** Assigned to the 2009 Land Cover Map.
+* **Fires (2014–2018):** Assigned to the 2018 Land Cover Map.
+* **Fires (2019–2022):** Assigned to the 2019-2020 Land Cover Map.
+
+To ensure the project is portable and efficient, we will "crop" the original heavy rasters from the external drive to the study area and save them in the local `Data/` folder using LZW compression.
+
 ```{r}
-# 1. Carregar el ràster 
-mcsc_2009 <- rast("C:/Users/LENOVO/Downloads/cobertes-sol-v1r0-2009.tif")
+# 3. Define paths (External USB and Local Project)
+#usb_path <- "E:/MASTER Data science/Màster en Data Science/TFM/"
+#tif_files <- c("cobertes-sol-v1r0-2009.tif", 
+#               "cobertes-sol-v1r0-2018.tif", 
+#               "cobertes-sol-v1r0-2019-2020.tif")
 
-# 2. Convertir els teus incendis a format espacial
-# Suposem que 'wfc_consolidated' és el teu dataset
-incendis_sf <- st_as_sf(wfc_consolidated, coords = c("longitude", "latitude"), crs = 4326)
-
-# 3. Projectar els incendis al sistema del ràster (molt important!)
-# Els ràsters de l'ICGC solen estar en UTM 31N (EPSG:25831)
-incendis_proj <- st_transform(incendis_sf, crs(mcsc_2009))
-
-# 4. Extreure el valor del píxel per a cada incendi
-# Això et donarà un número (el codi de la coberta)
-valors_coberta <- extract(mcsc_2009, vect(incendis_proj))
-
-# 5. Afegir-ho al dataset
-wfc_consolidated$codi_mcsc <- valors_coberta[, 2]
-
+# 4. Process each raster: Crop and Compress
+#for (f in tif_files) {
+#  message("Processing and cropping: ", f)
+  
+  # Load original raster from USB
+#  r_source <- rast(paste0(usb_path, f))
+  
+  # Project bounding box to match Raster CRS
+#  bbox_proj <- st_transform(study_area_bbox, crs(r_source))
+  
+  # Crop the raster to the study area
+#  r_cropped <- crop(r_source, vect(bbox_proj))
+  
+  # Save locally in the Data folder with high compression
+#  writeRaster(r_cropped, here("Data", f), 
+#              gdal = c("COMPRESS=LZW", "PREDICTOR=2"), 
+#              overwrite = TRUE)
+#}
 ```
 
 
+```{r}
+# 1. Convert to spatial format (EPSG:4326 - WGS84)
+incendis_sf <- st_as_sf(wfc_consolidated, coords = c("longitude", "latitude"), crs = 4326)
+
+# 2. Create a bounding box to crop the rasters (saves space for Git)
+# We add a small buffer (0.1 degrees) around our fire points
+study_area <- st_bbox(incendis_sf) %>% st_as_sfc() %>% st_buffer(0.1)
+```
+
+
+
+## 5.2 Spatial Extraction and Temporal Mapping
+
+We now iterate through each Land Cover raster. For each file, we:
+
+1. Clip the raster to our study area to reduce file size for GitHub compatibility.
+2. Reproject our fire coordinates to match the raster's CRS (usually UTM 31N).
+3. Extract the land cover class for each fire location.
+4. Filter and assign the values to the main dataset based on the fire's year.
+
+```{r}
+# Initialize columns for land cover
+wfc_consolidated$land_cover_id <- NA
+
+for (f in tif_files) {
+  message("Processing raster: ", f)
+  
+  # Load raster from USB
+  r_full <- rast(paste0(usb_path, f))
+  
+  # Project study area to Raster CRS for cropping
+  study_area_proj <- st_transform(study_area, crs(r_full))
+  
+  # Crop and Save locally (This allows the tutor to run it without the USB)
+  r_cropped <- crop(r_full, vect(study_area_proj))
+  writeRaster(r_cropped, here("Data", f), gdal="COMPRESS=LZW", overwrite=TRUE)
+  
+  # Project fire points to Raster CRS
+  incendis_proj <- st_transform(incendis_sf, crs(r_cropped))
+  
+  # Extract values
+  extracted_values <- extract(r_cropped, vect(incendis_proj))[, 2]
+  
+  # Temporal assignment logic
+  if (grepl("2009", f)) {
+    # Fires from start until 2013
+    mask <- wfc_consolidated$year <= 2013
+    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+    
+  } else if (grepl("2018", f)) {
+    # Fires from 2014 to 2018
+    mask <- wfc_consolidated$year >= 2014 & wfc_consolidated$year <= 2018
+    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+    
+  } else if (grepl("2019-2020", f)) {
+    # Fires from 2019 to 2022
+    mask <- wfc_consolidated$year >= 2019
+    wfc_consolidated$land_cover_id[mask] <- extracted_values[mask]
+  }
+}
+
+# Save the final light-weight dataset
+nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_final_analysis.parquet"))
+
+# Final check
+table(wfc_consolidated$land_cover_id, useNA = "always")
+```
 
 
 MODEL D'ELEVACIONS
 
-```{r}
-# 1. Carregar el ràster d'elevacions (MDT)
-mdt <- rast("C:/Users/LENOVO/Downloads/model-elevacions-terreny-topografic-catalunya-5m-2009-2018.tif")
-
-# 2. Calcular el Pendent (Slope)
-# El pendent és vital per al Random Forest. El calculem en graus.
-pendent <- terrain(mdt, v = "slope", unit = "degrees")
-
-# 3. Visualització ràpida per comprovar que tot és correcte
-plot(mdt, main = "Model Digital d'Elevacions")
-plot(pendent, main = "Mapa de Pendents (Graus)")
-```
