@@ -1,0 +1,63 @@
+---
+title: "EDA"
+author: "Gemma Bargalló Solé"
+date: "2026-04-20"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float:
+      position: left
+    toc_depth: 5   
+  word_document: default
+  pdf_document: default
+---
+
+```{r packages import, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(nanoparquet)
+library(here)
+library(scales)
+library(naniar) 
+library(skimr) 
+library(patchwork)
+```
+
+# 1. Data Import
+
+```{r}
+# Final dataset import
+wfc <- read_parquet(here("Data", "wfc_consolidated_landcover.parquet"))
+
+# Variable changes
+wfc <- wfc %>%
+  mutate(
+    causa = as.factor(causa),
+    provincia = as.factor(provincia),
+    land_cover_id = as.factor(land_cover_id),
+    month_detected = factor(month_detected, levels = c("gen", "feb", "mar", "abr", "mai", "jun", 
+                                                       "jul", "ago", "set", "oct", "nov", "des"))
+  )
+
+glimpse(wfc)
+```
+
+# 2. Missing Data Analysis
+
+```{r}
+### 2.1. Overall Missingness
+# Missings totals al dataframe
+res_missing <- miss_var_summary(wfc)
+print(res_missing)
+
+### 2.2. Visualizing Missing Patterns
+gg_miss_var(wfc) + 
+  labs(title = "Missing Values by Variable")
+
+vis_miss(wfc, warn_large_data = FALSE) +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+
+
+
