@@ -59,5 +59,45 @@ vis_miss(wfc, warn_large_data = FALSE) +
 ```
 
 
+# 3. Descriptive Statistics 
 
+```{r}
+### 3.1. Detailed Summary Table
+skim(wfc)
+```
+
+
+# 4. Univariate Analysis (Distributions)
+## 4.1. Numeric Variables (Outliers check)
+```{r}
+numeric_vars <- c("superficie_total_forestal", "tx", "tn", "ppt", "altitude_z", "thermal_amplitude")
+
+wfc %>%
+  select(all_of(numeric_vars)) %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(x = name, y = value)) +
+  geom_boxplot(fill = "orange", alpha = 0.7) +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal() +
+  labs(title = "Boxplots of Numeric Variables (Outlier Detection)", x = "", y = "Value")
+```
+
+## 4.2. Categorical Variables (Frequency)
+
+```{r}
+# Gràfic de barres per a la causa i la província
+p1 <- ggplot(wfc, aes(x = fct_infreq(provincia))) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Fires by Province", x = "Province")
+
+p2 <- wfc %>% 
+  count(causa) %>%
+  mutate(causa = fct_reorder(causa, n)) %>%
+  ggplot(aes(x = causa, y = n)) +
+  geom_col(fill = "firebrick") +
+  coord_flip() +
+  labs(title = "Fires by Cause", x = "Cause")
+
+p1 / p2 # Gràcies a 'patchwork' posem un sobre l'altre
+```
 
