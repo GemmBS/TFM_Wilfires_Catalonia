@@ -42,7 +42,8 @@ wfc <- wfc %>%
 glimpse(wfc)
 ```
 
-# 2. Missing Data Analysis
+# 2. Data cleaning
+## 2.1 Missing Data Analysis
 
 ```{r}
 ### 2.1. Overall Missingness
@@ -59,6 +60,122 @@ vis_miss(wfc, warn_large_data = FALSE) +
 ```
 
 
+- **Meteorology (48.5%)**: This is consistent with the historical nature of the data. Nearly half of the dataset lacks temperature records, likely due to the limited number of active weather stations during the earlier years of the study period.
+
+- **Months (22.5%)**: This is a coding error. There are 3,246 wildfire records where the month is labeled as NA. This is likely because certain months (such as January) did not match the predefined factor levels during the transformation process.
+
+- **Precipitation and altitude (14.2%)**: These 2,041 missing values are likely due to the technical specifications of certain Meteocat stations, which may only record temperature variables and not precipitation, or vice versa.
+
+
+### 2.1.1. Month_detected
+
+```{r}
+wfc <- wfc %>%
+  mutate(month_detected = month(date_detected, label = TRUE, abbr = TRUE))
+
+wfc <- wfc %>%
+  mutate(
+    month_detected = month(date_detected, 
+                           label = TRUE, 
+                           abbr = TRUE, 
+                           locale = "en_US.UTF-8")
+  )
+
+levels(wfc$month_detected)
+sum(is.na(wfc$month_detected))
+
+```
+
+### 2.1.2 TX, TN and Termal amplitude
+
+FER ELS CODIS DE BAIX AMB LES VARIABLES tx, tn i termal amplitude.
+
+```{r}
+# Missing patterns by Municipality
+
+missing_by_county <- wfc %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    n_miss_tx = sum(is.na(tx)),
+    pct_miss_tx = (n_miss_tx / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_tx))
+
+missing_by_county
+```
+
+```{r}
+# Mirem les comarques amb més incendis i el seu % de missings
+missing_by_county %>% 
+  filter(total_fires > 10) %>% # Filtrem municipis amb un mínim d'incendis per tenir mostra
+  head(20)
+```
+
+# Fase 1: Imputació per Comarca i Mes
+
+Aquest pas omplirà els buits d'aquells incendis on la comarca sí té estacions, però que per algun motiu puntual (fallada de l'estació aquell dia) no tenien dada.
+
+```{r}
+# 2.1.4. Hierarchical Imputation - Stage 1: County & Month Mean
+wfc_imputed <- wfc %>%
+  group_by(county_clean, month_detected) %>%
+  mutate(
+    # Omplim TX si és NA amb la mitjana del mateix mes i comarca
+    tx = ifelse(is.na(tx), mean(tx, na.rm = TRUE), tx),
+    tn = ifelse(is.na(tn), mean(tn, na.rm = TRUE), tn),
+    thermal_amplitude = ifelse(is.na(thermal_amplitude), mean(thermal_amplitude, na.rm = TRUE), thermal_amplitude)
+  ) %>%
+  ungroup()
+
+# Comprovem quants missings queden (encara en quedaran molts a les 22 comarques buides)
+sum(is.na(wfc_imputed$tx))
+```
+```{r}
+# Missing patterns by County
+
+missing_by_county <- wfc_imputed %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    n_miss_tx = sum(is.na(tx)),
+    pct_miss_tx = (n_miss_tx / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_tx))
+
+missing_by_county
+```
+
+# Fase 2: Imputació Espai-Temporal: (KNN)
+
+Per a les 22 comarques "cegues", farem servir l'algoritme KNN (K-Nearest Neighbors). L'algoritme buscarà els $k$ incendis més propers (p. ex. els 5 més propers) basant-se en latitude i longitude i els assignarà la seva mitjana.Utilitzarem la llibreria VIM, que és molt eficient per a això:
+
+```{r}
+library(VIM)
+
+# 1. Preparem les dades per a la imputació
+wfc_prep <- wfc_imputed %>%
+  mutate(
+    # Convertim la data a un número (dies) per poder calcular distàncies temporals
+    date_numeric = as.numeric(date_detected)
+  )
+
+# 2. Apliquem KNN considerant Latitud, Longitud I Data
+# kNN automàticament escala les variables per calcular la distància de Gower
+wfc_final <- kNN(wfc_prep, 
+                 variable = c("tx", "tn", "thermal_amplitude"), 
+                 dist_var = c("latitude", "longitude", "date_numeric"), 
+                 k = 5, 
+                 imp_var = FALSE)
+
+# 3. Netegem la columna auxiliar
+wfc_final <- wfc_final %>% select(-date_numeric)
+
+# Comprovació final
+sum(is.na(wfc_final$tx))
+```
+
+
 # 3. Descriptive Statistics 
 
 ```{r}
@@ -69,7 +186,7 @@ skim(wfc)
 
 # 4. Univariate Analysis (Distributions)
 ## 4.1. Numeric Variables (Outliers check)
-```{r}
+```{r packages import, warning=FALSE, message=FALSE}
 numeric_vars <- c("superficie_total_forestal", "tx", "tn", "ppt", "altitude_z", "thermal_amplitude")
 
 wfc %>%
