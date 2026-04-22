@@ -22,6 +22,12 @@ library(naniar)
 library(skimr) 
 library(patchwork)
 library(VIM)
+library(gt)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
 ```
 
 # 1. Data Import
@@ -246,47 +252,197 @@ sum(is.na(wfc_final2$ppt))
 sum(is.na(wfc_final2$altitude_z))
 ```
 
+```{r}
+# Missings totals al dataframe
+res_missing <- miss_var_summary(wfc_final2)
+print(res_missing)
+```
+
+By implementing the two-stage hierarchical imputation protocol, the overall missing data rate across the entire dataframe was successfully reduced from 6.8% to 0.55%. This substantial improvement ensures the structural integrity of the dataset for the modeling phase. The remaining 0.55% of missing values are exclusively located in the land_cover_id variable, which was not included in the spatial-temporal KNN process to avoid introducing categorical bias.
 
 
-# 3. Descriptive Statistics 
+## 2.2 Preliminary variable filtering
+
+```{r}
+wfc_final2$year <- as.factor(wfc_final2$year)
+wfc_final2$motivacion <- as.factor(wfc_final2$motivacion)
+str(wfc_final2)
+summary(wfc_final2)
+```
+At this stage, all remaining variables were retained for subsequent analyses. No further feature elimination was performed, as these variables were considered potentially relevant for the exploratory and modeling phases.
+
+
+# 3. Exploratory Data Analysis (EDA)
+## 3.1 Descriptive analysis
 
 ```{r}
 ### 3.1. Detailed Summary Table
-skim(wfc)
+skim(wfc_final2)
+```
+
+```{r}
+num_summary <- wfc_final2 %>%
+  select(where(is.numeric)) %>%
+  map_dfr(function(x) {
+    tibble(
+      n = sum(!is.na(x)),
+      missing = sum(is.na(x)),
+      mean = mean(x, na.rm = TRUE),
+      median = median(x, na.rm = TRUE),
+      min = min(x, na.rm = TRUE),
+      max = max(x, na.rm = TRUE)
+    )
+  }, .id = "variable") %>%
+  mutate(
+    range = paste0(round(min, 2), " - ", round(max, 2))
+  ) %>%
+  select(variable, n, missing, mean, median, range)
+
+gt_num <- num_summary %>%
+  mutate(variable = paste0("**", variable, "**")) %>%
+  gt() %>%
+  tab_header(
+    title = "Descriptive statistics - Numerical variables"
+  ) %>%
+  fmt_markdown(columns = variable) %>%
+  fmt_number(
+    columns = c(mean, median),
+    decimals = 2
+  ) %>%
+  opt_table_font(
+    font = list(
+      gt::google_font("Times New Roman"),
+      "Times New Roman",
+      "serif"
+    )
+  )
+gt_num
+```
+
+
+```{r}
+# 1. Crear el resum per a variables categòriques
+cat_summary <- wfc_final2 %>%
+  select(where(~is.character(.) | is.factor(.))) %>%
+  names() %>%
+  map_df(function(var) {
+    wfc_final2 %>%
+      count(!!sym(var)) %>%
+      mutate(
+        variable = var,
+        level = as.character(!!sym(var)),
+        percent = n / sum(n) * 100
+      ) %>%
+      mutate(level = ifelse(is.na(level), "Missing", level)) %>%
+      select(variable, level, n, percent)
+  })
+
+# 2. Crear la taula gt
+
+# 1. Preparem les dades fora de la taula per evitar errors de format
+cat_summary_clean <- cat_summary %>%
+  mutate(
+    # Assegurem que el percentatge sigui numèric per evitar errors de format
+    percent = as.numeric(ifelse(is.na(percent), 0, percent)),
+    level = ifelse(is.na(level), "Missing", level)
+  )
+
+# 2. Generem la taula
+gt_cat <- cat_summary_clean %>%
+  gt(groupname_col = "variable") %>%
+  tab_header(
+    title = "Descriptive statistics - Categorical variables"
+  ) %>%
+  # Forçar negreta als noms de les variables (grups)
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_row_groups()
+  ) %>%
+  # Forçar negreta a les capçaleres de les columnes
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  ) %>%
+  # CONFIGURACIÓ DE DECIMALS: 2 decimals per a la columna percent
+  fmt_number(
+    columns = percent, 
+    decimals = 2
+  ) %>%
+  # Estil tipogràfic Times New Roman
+  opt_table_font(
+    font = list(
+      gt::google_font("Times New Roman"),
+      "Times New Roman",
+      "serif"
+    )
+  )
+
+# Visualització
+gt_cat
 ```
 
 
 # 4. Univariate Analysis (Distributions)
 ## 4.1. Numeric Variables (Outliers check)
-```{r packages import, warning=FALSE, message=FALSE}
-numeric_vars <- c("superficie_total_forestal", "tx", "tn", "ppt", "altitude_z", "thermal_amplitude")
 
-wfc %>%
-  select(all_of(numeric_vars)) %>%
-  pivot_longer(everything()) %>%
-  ggplot(aes(x = name, y = value)) +
-  geom_boxplot(fill = "orange", alpha = 0.7) +
-  facet_wrap(~name, scales = "free") +
+This code uses pivot_longer to prepare all numerical data at once and facet_wrap to create a grid of plots, which is much more efficient than doing them one by one.
+
+```{r packages import, warning=FALSE, message=FALSE}
+# Prepare numerical data in long format
+wfc_num_long <- wfc_final2 %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value")
+
+# 1.1. Combined Histogram and Density Plots
+# Useful for checking the distribution shape (normality, skewness)
+ggplot(wfc_num_long, aes(x = value)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.6) +
+  geom_density(color = "firebrick", size = 1) +
+  facet_wrap(~variable, scales = "free") +
   theme_minimal() +
-  labs(title = "Boxplots of Numeric Variables (Outlier Detection)", x = "", y = "Value")
+  labs(
+    title = "Distribution Analysis: Histograms and Density",
+    subtitle = "Numerical variables from the wildfire dataset",
+    x = "Value", 
+    y = "Density"
+  )
+
+# 1.2. Boxplots
+# Crucial for identifying outliers and understanding the interquartile range (IQR)
+ggplot(wfc_num_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16, outlier.alpha = 0.5) +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(
+    title = "Outlier Detection: Boxplots",
+    x = "Variable", 
+    y = "Value"
+  )
 ```
 
 ## 4.2. Categorical Variables (Frequency)
 
 ```{r}
-# Gràfic de barres per a la causa i la província
-p1 <- ggplot(wfc, aes(x = fct_infreq(provincia))) +
-  geom_bar(fill = "steelblue") +
-  labs(title = "Fires by Province", x = "Province")
+# Create a list of bar plots for all categorical variables
+# Using Lapply to iterate through character and factor columns
+categorical_vars <- wfc_final2 %>%
+  select(where(~is.character(.) | is.factor(.))) %>%
+  names()
 
-p2 <- wfc %>% 
-  count(causa) %>%
-  mutate(causa = fct_reorder(causa, n)) %>%
-  ggplot(aes(x = causa, y = n)) +
-  geom_col(fill = "firebrick") +
-  coord_flip() +
-  labs(title = "Fires by Cause", x = "Cause")
+plots_cat <- lapply(categorical_vars, function(var) {
+  ggplot(wfc_final2, aes(y = fct_infreq(!!sym(var)))) +
+    geom_bar(fill = "darkseagreen", alpha = 0.8) +
+    theme_minimal() +
+    labs(
+      title = paste("Frequency Distribution:", var),
+      x = "Count (Number of Fires)", 
+      y = "Category"
+    )
+})
 
-p1 / p2 # Gràcies a 'patchwork' posem un sobre l'altre
+walk(plots_cat, print)
+
+
 ```
 
