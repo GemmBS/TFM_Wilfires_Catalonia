@@ -172,9 +172,79 @@ wfc_final <- wfc_final %>% select(-date_numeric)
 sum(is.na(wfc_final$tx))
 ```
 
+### 2.1.3 Altitude and ppt
 
+```{r}
+# Missing patterns by County
 
+missing_by_county2 <- wfc_final %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    # PPT: 
+    n_miss_ppt = sum(is.na(ppt)),
+    pct_miss_ppt = (n_miss_ppt / total_fires) * 100,
+    # Altitude
+    n_miss_alt = sum(is.na(altitude_z)),
+    pct_miss_alt = (n_miss_alt / total_fires) * 100
+  ) %>% 
+  arrange(desc(pct_miss_alt))
 
+print(missing_by_county2)
+```
+
+- **Stage 1: County-level and Monthly Mean Imputation**
+
+This step addresses records within counties that possess active weather stations but lack data for specific dates due to isolated station failures or temporary technical issues.
+
+```{r}
+wfc_imputed2 <- wfc_final %>%
+  group_by(county_clean, month_detected) %>%
+  mutate(
+    ppt = ifelse(is.na(ppt), mean(ppt, na.rm = TRUE), ppt),
+    altitude_z = ifelse(is.na(altitude_z), mean(altitude_z, na.rm = TRUE), altitude_z),
+  ) %>%
+  ungroup()
+
+sum(is.na(wfc_imputed2$ppt))
+```
+
+```{r}
+# Missing patterns by County
+missing_by_county2 <- wfc_imputed2 %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    # PPT
+    n_miss_ppt = sum(is.na(ppt)),
+    pct_miss_ppt = (n_miss_ppt / total_fires) * 100,
+    # Altitude
+    n_miss_alt = sum(is.na(altitude_z)),
+    pct_miss_alt = (n_miss_alt / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_alt))
+
+print(missing_by_county2)
+```
+
+- **Stage 2: Spatio-Temporal KNN Imputation (to clean the 100% missing counties)**
+
+```{r}
+wfc_prep <- wfc_imputed2 %>%
+  mutate(date_numeric = as.numeric(date_detected))
+
+wfc_final2 <- kNN(wfc_prep, 
+                 variable = c("ppt", "altitude_z"), 
+                 dist_var = c("latitude", "longitude", "date_numeric"), 
+                 k = 5, 
+                 imp_var = FALSE)
+
+# 3. Final cleanup and verification
+wfc_final2 <- wfc_final2 %>% select(-date_numeric)
+
+sum(is.na(wfc_final2$ppt))
+sum(is.na(wfc_final2$altitude_z))
+```
 
 
 
