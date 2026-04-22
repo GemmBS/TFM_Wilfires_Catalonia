@@ -21,6 +21,7 @@ library(scales)
 library(naniar) 
 library(skimr) 
 library(patchwork)
+library(VIM)
 ```
 
 # 1. Data Import
@@ -88,10 +89,8 @@ sum(is.na(wfc$month_detected))
 
 ### 2.1.2 TX, TN and Termal amplitude
 
-FER ELS CODIS DE BAIX AMB LES VARIABLES tx, tn i termal amplitude.
-
 ```{r}
-# Missing patterns by Municipality
+# Missing patterns by county
 
 missing_by_county <- wfc %>%
   group_by(county_clean) %>%
@@ -105,16 +104,10 @@ missing_by_county <- wfc %>%
 missing_by_county
 ```
 
-```{r}
-# Mirem les comarques amb més incendis i el seu % de missings
-missing_by_county %>% 
-  filter(total_fires > 10) %>% # Filtrem municipis amb un mínim d'incendis per tenir mostra
-  head(20)
-```
 
-# Fase 1: Imputació per Comarca i Mes
+- **Stage 1: County-level and Monthly Mean Imputation**
 
-Aquest pas omplirà els buits d'aquells incendis on la comarca sí té estacions, però que per algun motiu puntual (fallada de l'estació aquell dia) no tenien dada.
+This step addresses records within counties that possess active weather stations but lack data for specific dates due to isolated station failures or temporary technical issues.
 
 ```{r}
 # 2.1.4. Hierarchical Imputation - Stage 1: County & Month Mean
@@ -128,7 +121,6 @@ wfc_imputed <- wfc %>%
   ) %>%
   ungroup()
 
-# Comprovem quants missings queden (encara en quedaran molts a les 22 comarques buides)
 sum(is.na(wfc_imputed$tx))
 ```
 ```{r}
@@ -138,42 +130,52 @@ missing_by_county <- wfc_imputed %>%
   group_by(county_clean) %>%
   summarise(
     total_fires = n(),
+    # TX
     n_miss_tx = sum(is.na(tx)),
-    pct_miss_tx = (n_miss_tx / total_fires) * 100
+    pct_miss_tx = (n_miss_tx / total_fires) * 100,
+    # TN
+    n_miss_tn = sum(is.na(tn)),
+    pct_miss_tn = (n_miss_tn / total_fires) * 100,
+    # Thermal Amplitude
+    n_miss_ta = sum(is.na(thermal_amplitude)),
+    pct_miss_ta = (n_miss_ta / total_fires) * 100
   ) %>%
   arrange(desc(pct_miss_tx))
 
-missing_by_county
+print(missing_by_county)
 ```
 
-# Fase 2: Imputació Espai-Temporal: (KNN)
+- **Stage 2: Spatio-Temporal K-Nearest Neighbors (KNN) Imputation**
 
-Per a les 22 comarques "cegues", farem servir l'algoritme KNN (K-Nearest Neighbors). L'algoritme buscarà els $k$ incendis més propers (p. ex. els 5 més propers) basant-se en latitude i longitude i els assignarà la seva mitjana.Utilitzarem la llibreria VIM, que és molt eficient per a això:
+For the 22 'blind' counties (those with a 100% missingness rate), we will apply the K-Nearest Neighbors (KNN) algorithm. This method identifies the 'k' most similar fire events (e.g., k=5) based on their geographic proximity latitude and longitude and assigns the average value of these neighbors to the missing record. 
 
 ```{r}
-library(VIM)
-
-# 1. Preparem les dades per a la imputació
+# 1.Prepare the data for imputation
 wfc_prep <- wfc_imputed %>%
   mutate(
     # Convertim la data a un número (dies) per poder calcular distàncies temporals
     date_numeric = as.numeric(date_detected)
   )
 
-# 2. Apliquem KNN considerant Latitud, Longitud I Data
-# kNN automàticament escala les variables per calcular la distància de Gower
+# 2. Apply KNN considering Latitude, Longitude, and Date
+# kNN automatically scales variables to calculate Gower's distance
 wfc_final <- kNN(wfc_prep, 
                  variable = c("tx", "tn", "thermal_amplitude"), 
                  dist_var = c("latitude", "longitude", "date_numeric"), 
                  k = 5, 
                  imp_var = FALSE)
 
-# 3. Netegem la columna auxiliar
+# 3. Clean up the auxiliary column
 wfc_final <- wfc_final %>% select(-date_numeric)
 
-# Comprovació final
+# Final check for remaining missing values
 sum(is.na(wfc_final$tx))
 ```
+
+
+
+
+
 
 
 # 3. Descriptive Statistics 
