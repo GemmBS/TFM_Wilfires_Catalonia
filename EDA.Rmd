@@ -208,7 +208,6 @@ wfc_imputed2 <- wfc_final %>%
   group_by(county_clean, month_detected) %>%
   mutate(
     ppt = ifelse(is.na(ppt), mean(ppt, na.rm = TRUE), ppt),
-    altitude_z = ifelse(is.na(altitude_z), mean(altitude_z, na.rm = TRUE), altitude_z),
   ) %>%
   ungroup()
 
@@ -280,9 +279,15 @@ At this stage, all remaining variables were retained for subsequent analyses. No
 skim(wfc_final2)
 ```
 
+### 3.1.1 Numerical variables
+
 ```{r}
+# 1. Summary calculation for strictly numerical variables
+# We explicitly exclude the time variables to ensure clean calculations
 num_summary <- wfc_final2 %>%
   select(where(is.numeric)) %>%
+  # If time_detected or time_extinguished were somehow being caught, we drop them:
+  select(-any_of(c("time_detected", "time_extinguished"))) %>%
   map_dfr(function(x) {
     tibble(
       n = sum(!is.na(x)),
@@ -298,6 +303,7 @@ num_summary <- wfc_final2 %>%
   ) %>%
   select(variable, n, missing, mean, median, range)
 
+# 2. Generate the GT table
 gt_num <- num_summary %>%
   mutate(variable = paste0("**", variable, "**")) %>%
   gt() %>%
@@ -316,9 +322,143 @@ gt_num <- num_summary %>%
       "serif"
     )
   )
+
+# Display the table
 gt_num
 ```
 
+
+#### Possible outliers:
+
+**Latitude and longitude**
+
+```{r}
+# 1. Identify records outside the geographic boundaries of Catalonia
+geo_outliers <- wfc_final2 %>%
+  filter(latitude < 40.5 | latitude > 43.0 | longitude < 0 | longitude > 4) %>%
+  select(municipio, county_clean, latitude, longitude, year)
+
+# 2. Count diagnostic
+cat("Number of records outside the valid range:", nrow(geo_outliers), "\n")
+
+# 3. Create the beautiful gt table
+gt_outliers <- geo_outliers %>%
+  gt() %>%
+  tab_header(
+    title = "Geographic Outliers Identification",
+    subtitle = paste("Total records to verify:", nrow(geo_outliers))
+  ) %>%
+  cols_label(
+    municipio = "Municipality",
+    county_clean = "County",
+    latitude = "Latitude",
+    longitude = "Longitude",
+    year = "Year"
+  ) %>%
+  # Estil visual
+  opt_table_font(
+    font = list(gt::google_font("Times New Roman"), "serif")
+  ) %>%
+  tab_style(
+    style = cell_fill(color = "lavender"),
+    locations = cells_body(columns = c(latitude, longitude))
+  ) %>%
+  tab_options(
+    table.width = pct(100),
+    column_labels.font.weight = "bold"
+  )
+
+# Visualització
+gt_outliers
+gtsave(gt_outliers, "geographic_outliers.png")
+```
+
+
+```{r}
+wfc_final2 <- wfc_final2 %>%
+  mutate(
+    # Corregim la Latitud
+    latitude = case_when(
+      municipio == "MARTORELL" & year == 1998 ~ 41.47417,  
+      municipio == "CERVELLÓ" & year == 1998 ~ 41.397778,
+      municipio == "VALL DE BIANYA, LA" & year == 1998 ~ 42.2413,
+      municipio == "CASSÀ DE LA SELVA" & year == 1998 ~ 41.883333,
+      municipio == "FIGUERES" & year == 1998 ~ 42.2667,
+      municipio == "TORTOSA" & year == 1998 ~ 40.812500,
+      municipio == "TARRAGONA" & year == 1998 ~ 41.11905,
+      municipio == "CASTELLAR DE N' HUG" & year == 2000 ~ 42.253611,
+      municipio == "CAMARASA" & year == 2000 ~ 41.8667,
+      municipio == "FARRERA" & year == 2000 ~ 42.504167,
+      municipio == "VANDELLÒS I L' HOSPITALET" & year == 2000 ~ 41.021389,
+      municipio == "AVINYONET DEL PENEDÈS" & year == 2001 ~ 41.3606,
+      municipio == "FONT-RUBÍ" & year == 2001 ~ 41.415278,
+      municipio == "VILOPRIU" & year == 2001 ~ 42.107500,
+      municipio == "GUILS DE CERDANYA" & year == 2001 ~ 42.450556,
+      municipio == "GUINGUETA D' ANEU, LA" & year == 2001 ~ 42.595000,
+      municipio == "GELIDA" & year == 2002 ~ 41.4408,
+      municipio == "MASQUEFA" & year == 2002 ~ 41.5,
+      municipio == "TORTOSA" & year == 2002 ~ 40.812500,
+      municipio == "PALMA D' EBRE, LA" & year == 2002 ~ 41.2833302,
+      municipio == "SALT" & year == 2002 ~ 41.976111,
+      municipio == "SALT" & year == 2003 ~ 41.976111,
+      municipio == "BESCANÓ" & year == 2003 ~ 41.967222,
+      municipio == "CABRA DEL CAMP" & year == 2003 ~ 41.395278,
+      municipio == "MONISTROL DE CALDERS" & year == 2004 ~ 41.760278,
+      municipio == "OLESA DE BONESVALLS" & year == 2004 ~ 41.355278,
+      municipio == "CALDERS" & year == 2004 ~ 41.790556,
+      municipio == "SEU D' URGELL, LA" & year == 2004 ~ 42.35877,
+      municipio == "FORÈS" & year == 2004 ~ 41.494167,
+      TRUE ~ latitude  
+    ),
+    # Corregim la Longitud
+    longitude = case_when(
+      municipio == "MARTORELL" & year == 1998 ~ 1.93028, # He tret el "& longitude"
+      municipio == "CERVELLÓ" & year == 1998 ~ 1.957778,
+      municipio == "VALL DE BIANYA, LA" & year == 1998 ~ 2.4326,
+      municipio == "CASSÀ DE LA SELVA" & year == 1998 ~ 2.866667,
+      municipio == "FIGUERES" & year == 1998 ~ 2.9597,
+      municipio == "TORTOSA" & year == 1998 ~ 0.521111,
+      municipio == "TARRAGONA" & year == 1998 ~ 1.24544,
+      municipio == "CASTELLAR DE N' HUG" & year == 2000 ~ 2.020833,
+      municipio == "CAMARASA" & year == 2000 ~ 0.8833,
+      municipio == "FARRERA" & year == 2000 ~ 1.272222,
+      municipio == "VANDELLÒS I L' HOSPITALET" & year == 2000 ~ 0.831944,
+      municipio == "AVINYONET DEL PENEDÈS" & year == 2001 ~ 1.77648,
+      municipio == "FONT-RUBÍ" & year == 2001 ~ 1.651667,
+      municipio == "VILOPRIU" & year == 2001 ~ 2.994167,
+      municipio == "GUILS DE CERDANYA" & year == 2001 ~ 1.879444,
+      municipio == "GELIDA" & year == 2002 ~ 1.8647,
+      municipio == "MASQUEFA" & year == 2002 ~ 1.8167,
+      municipio == "TORTOSA" & year == 2002 ~ 0.521111,
+      municipio == "PALMA D' EBRE, LA" & year == 2002 ~ 0.6660391,
+      municipio == "SALT" & year == 2002 ~ 2.788056,
+      municipio == "SALT" & year == 2003 ~ 2.788056,
+      municipio == "BESCANÓ" & year == 2003 ~ 2.740556,
+      municipio == "CABRA DEL CAMP" & year == 2003 ~ 1.276111,
+      municipio == "MONISTROL DE CALDERS" & year == 2004 ~ 2.012778,
+      municipio == "OLESA DE BONESVALLS" & year == 2004 ~ 1.850556,
+      municipio == "CALDERS" & year == 2004 ~ 1.987778,
+      municipio == "SEU D' URGELL, LA" & year == 2004 ~ 1.46144,
+      municipio == "FORÈS" & year == 2004 ~ 1.237778,
+      TRUE ~ longitude
+    )
+  )
+```
+
+
+```{r}
+# 1. Identify records outside the geographic boundaries of Catalonia
+geo_outliers <- wfc_final2 %>%
+  filter(latitude < 40.5 | latitude > 43.0 | longitude < 0 | longitude > 4) %>%
+  select(municipio, county_clean, latitude, longitude, year)
+
+# 2. Count diagnostic
+cat("Number of records outside the valid range:", nrow(geo_outliers), "\n")
+geo_outliers
+```
+
+
+### 3.1.2 Categorical variables
 
 ```{r}
 # 1. Crear el resum per a variables categòriques
