@@ -1,3 +1,5 @@
+#ETL PROCESS
+
 library(DataExplorer)
 library(dplyr)
 library(ggplot2)
@@ -667,3 +669,395 @@ nanoparquet::write_parquet(wfc_consolidated, here("Data", "wfc_consolidated_land
 # Summary of results to verify assignments
 print("Land Cover assignment complete. Summary of classes:")
 table(wfc_consolidated$land_cover_id, useNA = "always")
+
+
+
+#EDA PROCESS
+
+library(tidyverse)
+library(nanoparquet)
+library(here)
+library(scales)
+library(naniar) 
+library(skimr) 
+library(patchwork)
+library(VIM)
+library(gt)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+
+# 1. Data Import
+
+# Final dataset import
+wfc <- read_parquet(here("Data", "wfc_consolidated_landcover.parquet"))
+
+# Variable changes
+wfc <- wfc %>%
+  mutate(
+    causa = as.factor(causa),
+    provincia = as.factor(provincia),
+    land_cover_id = as.factor(land_cover_id),
+    month_detected = factor(month_detected, levels = c("gen", "feb", "mar", "abr", "mai", "jun", 
+                                                       "jul", "ago", "set", "oct", "nov", "des"))
+  )
+
+glimpse(wfc)
+
+
+# 2. Data cleaning
+## 2.1 Missing Data Analysis
+
+### 2.1. Overall Missingness
+# Missings totals al dataframe
+res_missing <- miss_var_summary(wfc)
+print(res_missing)
+
+### 2.2. Visualizing Missing Patterns
+gg_miss_var(wfc) + 
+  labs(title = "Missing Values by Variable")
+
+vis_miss(wfc, warn_large_data = FALSE) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+### 2.1.1. Month_detected
+
+wfc <- wfc %>%
+  mutate(month_detected = month(date_detected, label = TRUE, abbr = TRUE))
+
+wfc <- wfc %>%
+  mutate(
+    month_detected = month(date_detected, 
+                           label = TRUE, 
+                           abbr = TRUE, 
+                           locale = "en_US.UTF-8")
+  )
+
+levels(wfc$month_detected)
+sum(is.na(wfc$month_detected))
+
+
+### 2.1.2 TX, TN and Termal amplitude
+# Missing patterns by county
+
+missing_by_county <- wfc %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    n_miss_tx = sum(is.na(tx)),
+    pct_miss_tx = (n_miss_tx / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_tx))
+
+missing_by_county
+
+
+#Stage 1: County-level and Monthly Mean Imputation
+  
+# 2.1.4. Hierarchical Imputation - Stage 1: County & Month Mean
+wfc_imputed <- wfc %>%
+  group_by(county_clean, month_detected) %>%
+  mutate(
+    # Omplim TX si és NA amb la mitjana del mateix mes i comarca
+    tx = ifelse(is.na(tx), mean(tx, na.rm = TRUE), tx),
+    tn = ifelse(is.na(tn), mean(tn, na.rm = TRUE), tn),
+    thermal_amplitude = ifelse(is.na(thermal_amplitude), mean(thermal_amplitude, na.rm = TRUE), thermal_amplitude)
+  ) %>%
+  ungroup()
+
+sum(is.na(wfc_imputed$tx))
+
+
+# Missing patterns by County
+
+missing_by_county <- wfc_imputed %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    # TX
+    n_miss_tx = sum(is.na(tx)),
+    pct_miss_tx = (n_miss_tx / total_fires) * 100,
+    # TN
+    n_miss_tn = sum(is.na(tn)),
+    pct_miss_tn = (n_miss_tn / total_fires) * 100,
+    # Thermal Amplitude
+    n_miss_ta = sum(is.na(thermal_amplitude)),
+    pct_miss_ta = (n_miss_ta / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_tx))
+
+print(missing_by_county)
+
+
+#Stage 2: Spatio-Temporal K-Nearest Neighbors (KNN) Imputation
+
+# 1.Prepare the data for imputation
+wfc_prep <- wfc_imputed %>%
+  mutate(
+    # Convertim la data a un número (dies) per poder calcular distàncies temporals
+    date_numeric = as.numeric(date_detected)
+  )
+
+# 2. Apply KNN considering Latitude, Longitude, and Date
+# kNN automatically scales variables to calculate Gower's distance
+wfc_final <- kNN(wfc_prep, 
+                 variable = c("tx", "tn", "thermal_amplitude"), 
+                 dist_var = c("latitude", "longitude", "date_numeric"), 
+                 k = 5, 
+                 imp_var = FALSE)
+
+# 3. Clean up the auxiliary column
+wfc_final <- wfc_final %>% select(-date_numeric)
+
+# Final check for remaining missing values
+sum(is.na(wfc_final$tx))
+
+
+
+
+### 2.1.3 Altitude and ppt
+
+# Missing patterns by County
+
+missing_by_county2 <- wfc_final %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    # PPT: 
+    n_miss_ppt = sum(is.na(ppt)),
+    pct_miss_ppt = (n_miss_ppt / total_fires) * 100,
+    # Altitude
+    n_miss_alt = sum(is.na(altitude_z)),
+    pct_miss_alt = (n_miss_alt / total_fires) * 100
+  ) %>% 
+  arrange(desc(pct_miss_alt))
+
+print(missing_by_county2)
+
+
+#Stage 1: County-level and Monthly Mean Imputation
+  
+
+wfc_imputed2 <- wfc_final %>%
+  group_by(county_clean, month_detected) %>%
+  mutate(
+    ppt = ifelse(is.na(ppt), mean(ppt, na.rm = TRUE), ppt),
+    altitude_z = ifelse(is.na(altitude_z), mean(altitude_z, na.rm = TRUE), altitude_z),
+  ) %>%
+  ungroup()
+
+sum(is.na(wfc_imputed2$ppt))
+
+
+# Missing patterns by County
+missing_by_county2 <- wfc_imputed2 %>%
+  group_by(county_clean) %>%
+  summarise(
+    total_fires = n(),
+    # PPT
+    n_miss_ppt = sum(is.na(ppt)),
+    pct_miss_ppt = (n_miss_ppt / total_fires) * 100,
+    # Altitude
+    n_miss_alt = sum(is.na(altitude_z)),
+    pct_miss_alt = (n_miss_alt / total_fires) * 100
+  ) %>%
+  arrange(desc(pct_miss_alt))
+
+print(missing_by_county2)
+
+
+
+#Stage 2: Spatio-Temporal KNN Imputation (to clean the 100% missing counties)
+  
+
+wfc_prep <- wfc_imputed2 %>%
+  mutate(date_numeric = as.numeric(date_detected))
+
+wfc_final2 <- kNN(wfc_prep, 
+                  variable = c("ppt", "altitude_z"), 
+                  dist_var = c("latitude", "longitude", "date_numeric"), 
+                  k = 5, 
+                  imp_var = FALSE)
+
+# 3. Final cleanup and verification
+wfc_final2 <- wfc_final2 %>% select(-date_numeric)
+
+
+# Missings totals al dataframe
+res_missing <- miss_var_summary(wfc_final2)
+print(res_missing)
+
+## 2.2 Preliminary variable filtering
+wfc_final2$year <- as.factor(wfc_final2$year)
+wfc_final2$motivacion <- as.factor(wfc_final2$motivacion)
+str(wfc_final2)
+summary(wfc_final2)
+sum(is.na(wfc_final2$ppt))
+sum(is.na(wfc_final2$altitude_z))
+
+
+# 3. Exploratory Data Analysis (EDA)
+## 3.1 Descriptive analysis
+### 3.1. Detailed Summary Table
+skim(wfc_final2)
+
+
+num_summary <- wfc_final2 %>%
+  select(where(is.numeric)) %>%
+  map_dfr(function(x) {
+    tibble(
+      n = sum(!is.na(x)),
+      missing = sum(is.na(x)),
+      mean = mean(x, na.rm = TRUE),
+      median = median(x, na.rm = TRUE),
+      min = min(x, na.rm = TRUE),
+      max = max(x, na.rm = TRUE)
+    )
+  }, .id = "variable") %>%
+  mutate(
+    range = paste0(round(min, 2), " - ", round(max, 2))
+  ) %>%
+  select(variable, n, missing, mean, median, range)
+
+gt_num <- num_summary %>%
+  mutate(variable = paste0("**", variable, "**")) %>%
+  gt() %>%
+  tab_header(
+    title = "Descriptive statistics - Numerical variables"
+  ) %>%
+  fmt_markdown(columns = variable) %>%
+  fmt_number(
+    columns = c(mean, median),
+    decimals = 2
+  ) %>%
+  opt_table_font(
+    font = list(
+      gt::google_font("Times New Roman"),
+      "Times New Roman",
+      "serif"
+    )
+  )
+gt_num
+
+
+# 1. Crear el resum per a variables categòriques
+cat_summary <- wfc_final2 %>%
+  select(where(~is.character(.) | is.factor(.))) %>%
+  names() %>%
+  map_df(function(var) {
+    wfc_final2 %>%
+      count(!!sym(var)) %>%
+      mutate(
+        variable = var,
+        level = as.character(!!sym(var)),
+        percent = n / sum(n) * 100
+      ) %>%
+      mutate(level = ifelse(is.na(level), "Missing", level)) %>%
+      select(variable, level, n, percent)
+  })
+
+# 2. Crear la taula gt
+
+# 1. Preparem les dades fora de la taula per evitar errors de format
+cat_summary_clean <- cat_summary %>%
+  mutate(
+    # Assegurem que el percentatge sigui numèric per evitar errors de format
+    percent = as.numeric(ifelse(is.na(percent), 0, percent)),
+    level = ifelse(is.na(level), "Missing", level)
+  )
+
+# 2. Generem la taula
+gt_cat <- cat_summary_clean %>%
+  gt(groupname_col = "variable") %>%
+  tab_header(
+    title = "Descriptive statistics - Categorical variables"
+  ) %>%
+  # Forçar negreta als noms de les variables (grups)
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_row_groups()
+  ) %>%
+  # Forçar negreta a les capçaleres de les columnes
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_column_labels()
+  ) %>%
+  # CONFIGURACIÓ DE DECIMALS: 2 decimals per a la columna percent
+  fmt_number(
+    columns = percent, 
+    decimals = 2
+  ) %>%
+  # Estil tipogràfic Times New Roman
+  opt_table_font(
+    font = list(
+      gt::google_font("Times New Roman"),
+      "Times New Roman",
+      "serif"
+    )
+  )
+
+# Visualització
+gt_cat
+
+
+
+# 4. Univariate Analysis (Distributions)
+## 4.1. Numeric Variables (Outliers check)
+
+# Prepare numerical data in long format
+wfc_num_long <- wfc_final2 %>%
+  select(where(is.numeric)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value")
+
+# 1.1. Combined Histogram and Density Plots
+# Useful for checking the distribution shape (normality, skewness)
+ggplot(wfc_num_long, aes(x = value)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.6) +
+  geom_density(color = "firebrick", size = 1) +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  labs(
+    title = "Distribution Analysis: Histograms and Density",
+    subtitle = "Numerical variables from the wildfire dataset",
+    x = "Value", 
+    y = "Density"
+  )
+
+# 1.2. Boxplots
+# Crucial for identifying outliers and understanding the interquartile range (IQR)
+ggplot(wfc_num_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16, outlier.alpha = 0.5) +
+  facet_wrap(~variable, scales = "free") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(
+    title = "Outlier Detection: Boxplots",
+    x = "Variable", 
+    y = "Value"
+  )
+
+
+## 4.2. Categorical Variables (Frequency)
+# Create a list of bar plots for all categorical variables
+# Using Lapply to iterate through character and factor columns
+categorical_vars <- wfc_final2 %>%
+  select(where(~is.character(.) | is.factor(.))) %>%
+  names()
+
+plots_cat <- lapply(categorical_vars, function(var) {
+  ggplot(wfc_final2, aes(y = fct_infreq(!!sym(var)))) +
+    geom_bar(fill = "darkseagreen", alpha = 0.8) +
+    theme_minimal() +
+    labs(
+      title = paste("Frequency Distribution:", var),
+      x = "Count (Number of Fires)", 
+      y = "Category"
+    )
+})
+
+walk(plots_cat, print)
+
