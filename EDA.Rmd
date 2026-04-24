@@ -458,6 +458,54 @@ geo_outliers
 ```
 
 
+```{r}
+# 1. Summary calculation for strictly numerical variables
+# We explicitly exclude the time variables to ensure clean calculations
+num_summary <- wfc_final2 %>%
+  select(where(is.numeric)) %>%
+  # If time_detected or time_extinguished were somehow being caught, we drop them:
+  select(-any_of(c("time_detected", "time_extinguished"))) %>%
+  map_dfr(function(x) {
+    tibble(
+      n = sum(!is.na(x)),
+      missing = sum(is.na(x)),
+      mean = mean(x, na.rm = TRUE),
+      median = median(x, na.rm = TRUE),
+      min = min(x, na.rm = TRUE),
+      max = max(x, na.rm = TRUE)
+    )
+  }, .id = "variable") %>%
+  mutate(
+    range = paste0(round(min, 2), " - ", round(max, 2))
+  ) %>%
+  select(variable, n, missing, mean, median, range)
+
+# 2. Generate the GT table
+gt_num <- num_summary %>%
+  mutate(variable = paste0("**", variable, "**")) %>%
+  gt() %>%
+  tab_header(
+    title = "Descriptive statistics - Numerical variables"
+  ) %>%
+  fmt_markdown(columns = variable) %>%
+  fmt_number(
+    columns = c(mean, median),
+    decimals = 2
+  ) %>%
+  opt_table_font(
+    font = list(
+      gt::google_font("Times New Roman"),
+      "Times New Roman",
+      "serif"
+    )
+  )
+
+# Display the table
+gt_num
+```
+
+
+
 ### 3.1.2 Categorical variables
 
 ```{r}
@@ -531,6 +579,7 @@ This code uses pivot_longer to prepare all numerical data at once and facet_wrap
 # Prepare numerical data in long format
 wfc_num_long <- wfc_final2 %>%
   select(where(is.numeric)) %>%
+  select(-one_of("time_detected", "time_extinguished")) %>% 
   pivot_longer(everything(), names_to = "variable", values_to = "value")
 
 # 1.1. Combined Histogram and Density Plots
@@ -541,7 +590,7 @@ ggplot(wfc_num_long, aes(x = value)) +
   facet_wrap(~variable, scales = "free") +
   theme_minimal() +
   labs(
-    title = "Distribution Analysis: Histograms and Density",
+    title = "Distribution analysis: Histograms and Density",
     subtitle = "Numerical variables from the wildfire dataset",
     x = "Value", 
     y = "Density"
@@ -555,7 +604,7 @@ ggplot(wfc_num_long, aes(x = variable, y = value, fill = variable)) +
   theme_minimal() +
   theme(legend.position = "none") +
   labs(
-    title = "Outlier Detection: Boxplots",
+    title = "Outlier detection: Boxplots",
     x = "Variable", 
     y = "Value"
   )
@@ -585,4 +634,61 @@ walk(plots_cat, print)
 
 
 ```
+
+
+```{r}
+# Load libraries
+library(leaflet)
+library(dplyr)
+library(crosstalk)
+
+# 1. Data Preparation
+wfc_map_data <- wfc_final2 %>%
+  mutate(
+    # Ensure year is a factor for the dropdown selector
+    year_factor = as.factor(year),
+    # Create the customized popup text in English
+    popup_text = paste0(
+      "<div style='font-family: Arial; font-size: 12px;'>",
+      "<strong>Municipality:</strong> ", municipio, "<br>",
+      "<strong>Year:</strong> ", year, "<br>",
+      "<strong>Burnt Surface:</strong> ", superficie_total_forestal, " ha<br>",
+      "<strong>Land Cover ID:</strong> ", land_cover_id, "<br>",
+      "<strong>Cause:</strong> ", causa, "</div>"
+    )
+  ) %>%
+  select(longitude, latitude, year_factor, popup_text, superficie_total_forestal, municipio)
+
+# 2. Create SharedData object
+sd <- SharedData$new(wfc_map_data)
+
+# 3. Map layout with single year filter
+bscols(
+  widths = c(12),
+  # Year selector (dropdown)
+  filter_select(
+    id = "year_selector", 
+    label = "Select a specific year to visualize wildfires:", 
+    sharedData = sd, 
+    group = ~year_factor,
+    multiple = FALSE  # Ensures only one year is shown at a time
+  ),
+  # Leaflet Map with light background
+  leaflet(sd, width = "100%", height = 650) %>%
+    addTiles() %>% 
+    addProviderTiles(providers$CartoDB.Positron) %>% # Clean white/light background
+    addCircleMarkers(
+      lng = ~longitude, 
+      lat = ~latitude,
+      radius = ~sqrt(superficie_total_forestal) + 3, 
+      color = "#E44D2E",
+      stroke = TRUE,
+      weight = 1,
+      fillOpacity = 0.7,
+      popup = ~popup_text,
+      label = ~paste(municipio, "-", superficie_total_forestal, "ha") # Hover label
+    )
+)
+```
+
 
