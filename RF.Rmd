@@ -126,6 +126,56 @@ message("Testing set rows: ", nrow(test_set))
 ```
 
 
+# 3. Random Forest Model
+
+```{r}
+# Install and load ranger if you haven't
+library(ranger)
+
+# Train the Random Forest model
+# We predict 'log_surface' using all other columns in 'train_set'
+rf_model <- ranger(
+  formula         = log_surface ~ ., 
+  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  num.trees       = 500,
+  importance      = "permutation", # Important to analyze variable impact later
+  seed            = 123
+)
+
+# Print model summary
+print(rf_model)
+```
+
+```{r}
+# Get importance
+importance_values <- importance(rf_model)
+importance_df <- data.frame(
+  Variable = names(importance_values),
+  Importance = importance_values
+) %>% arrange(desc(Importance))
+
+# Plot importance
+library(ggplot2)
+ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Variable Importance in Wildfire Surface Prediction",
+       x = "Predictors", y = "Importance (Permutation)")
+```
+
+
+```{r}
+# Predict on test set
+predictions <- predict(rf_model, data = test_set)$predictions
+
+# Calculate Performance Metrics (RMSE and R2)
+postResample(pred = predictions, obs = test_set$log_surface)
+```
+
+
+
+
 # MAP
 
 ```{r}
