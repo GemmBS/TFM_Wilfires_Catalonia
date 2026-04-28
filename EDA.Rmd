@@ -610,6 +610,7 @@ ggplot(wfc_num_long, aes(x = variable, y = value, fill = variable)) +
   )
 ```
 
+
 ## 4.2. Categorical Variables (Frequency)
 
 ```{r}
@@ -635,6 +636,121 @@ walk(plots_cat, print)
 
 ```
 
+```{r}
+# 2. Save the dataframe as a CSV file
+# We use row.names = FALSE to avoid an empty first column with index numbers
+write.csv(wfc_final2, "data/wfc_final2.csv", row.names = FALSE)
+
+# 3. Confirmation message
+message("File successfully saved in: data/wfc_final2.csv")
+```
+
+
+
+# 5. Pre-processing and Feature Engineering
+## 5.1 Data Cleaning and Feature Selection
+In this step, we filter the columns, handle categorical variables as factors, and prepare the dataset for the model.
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(caret)
+
+# 1. Feature Selection and Formatting
+# FINAL MODEL DATASET SELECTION
+wfc_model_final <- wfc_final2 %>%
+  select(
+    # Target (Change this based on your goal)
+    superficie_total_forestal, 
+    
+    # Location
+    county_clean, altitude_z, latitude, longitude,
+    
+    # Meteorology
+    tx, ppt, thermal_amplitude,
+    
+    # Time
+    month_detected, hour_detected,year,
+    
+    # Land Cover & Risk
+    land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
+    afecto_espacio_protegido, afecto_zar,
+    
+    # Context
+    causa
+  ) %>%
+  # Convert to factors for Random Forest
+  mutate(across(where(is.character), as.factor),
+         land_cover_id = as.factor(land_cover_id),
+         month_detected = as.factor(month_detected),
+         # If hour_detected is numeric, we might keep it as is or factorize it
+         hour_detected = as.numeric(hour_detected)) %>%
+  drop_na()
+```
+
+
+
+## 5.2 Correlation Analysis
+
+We use Spearman correlation because your previous histograms showed that the numerical variables are not normally distributed.
+
+```{r}
+# Select only numerical columns for the matrix
+numeric_vars <- wfc_model_final %>% select(where(is.numeric))
+cor_matrix <- cor(numeric_vars, method = "spearman")
+
+# Plotting the correlation matrix
+corrplot(cor_matrix, 
+         method = "color", 
+         type = "upper", 
+         addCoef.col = "black", 
+         tl.col = "black", 
+         diag = FALSE,
+         title = "\nSpearman Correlation Matrix of Predictors",
+         mar = c(0,0,2,0))
+cor_matrix
+```
+
+## 5.3 Target Variable Transformation
+
+Since the burnt surface is highly skewed (most fires are small, few are huge), we apply a Logarithmic transformation to stabilize the variance.
+
+```{r}
+# Apply Log1p transformation (log(x + 1)) to handle 0 values
+wfc_model_final <- wfc_model_final %>%
+  mutate(log_surface = log1p(superficie_total_forestal))
+
+# Visualize the effect of the transformation
+par(mfrow=c(1,2))
+hist(wfc_model_final$superficie_total_forestal, main="Original Surface", col="salmon")
+hist(wfc_model_final$log_surface, main="Log-transformed Surface", col="lightblue")
+par(mfrow=c(1,1))
+```
+
+## 5.4 4. Data Splitting (Training and Testing)
+
+We split the data into an 80% Training set and a 20% Test set.
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Create the partition based on the target variable
+train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
+
+# Generate sets
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+
+# Print final dimensions
+message("Training set rows: ", nrow(train_set))
+message("Testing set rows: ", nrow(test_set))
+```
+
+
+# MAP
 
 ```{r}
 # Load libraries
