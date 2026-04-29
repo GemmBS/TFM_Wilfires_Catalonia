@@ -1,9 +1,27 @@
 ---
-title: "Data story telling"
-author: "Gemma Bargalló Solé"
-date: "2026-04-29"
-output: html_document
+title: "Catalonia Fire Storyboard"
+output: 
+  flexdashboard::flex_dashboard:
+    storyboard: true
 ---
+
+```{r}
+library(tidyverse)
+library(nanoparquet)
+library(here)
+library(scales)
+library(naniar) 
+library(skimr) 
+library(patchwork)
+library(VIM)
+library(gt)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(gridExtra)
+```
 
 # 1. Data Import
 
