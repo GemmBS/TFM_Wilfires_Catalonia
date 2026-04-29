@@ -28,6 +28,7 @@ library(forcats)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
+library(gridExtra)
 ```
 
 # 1. Data Import
@@ -625,8 +626,8 @@ plots_cat <- lapply(categorical_vars, function(var) {
     geom_bar(fill = "darkseagreen", alpha = 0.8) +
     theme_minimal() +
     labs(
-      title = paste("Frequency Distribution:", var),
-      x = "Count (Number of Fires)", 
+      title = paste("Frequency distribution:", var),
+      x = "Count (Number of fires)", 
       y = "Category"
     )
 })
@@ -635,6 +636,185 @@ walk(plots_cat, print)
 
 
 ```
+
+
+```{r}
+# 1. Data Preparation: Filtering Top 10 for Counties and Municipalities
+top_10_counties <- wfc_final2 %>%
+  count(county_clean) %>%
+  slice_max(n, n = 10)
+
+top_10_municipalities <- wfc_final2 %>%
+  count(municipio) %>%
+  slice_max(n, n = 10)
+
+# Professional Blue Palette (Hex codes)
+blue_dark  <- "#084594"
+blue_med   <- "#4292c6"
+blue_light <- "#9ecae1"
+
+# 2. Plot by Province
+p1 <- ggplot(wfc_final2, aes(x = reorder(provincia, provincia, function(x)-length(x)))) +
+  geom_bar(fill = blue_dark) +
+  theme_classic() + # Cleaner professional theme
+  labs(title = "Fire Frequency by Province", 
+       x = "Province", 
+       y = "Number of Fires") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_line(color = "grey90") # Only horizontal lines for scale
+  )
+
+# 3. Plot by County (Top 10)
+p2 <- ggplot(top_10_counties, aes(x = reorder(county_clean, -n), y = n)) +
+  geom_bar(stat = "identity", fill = blue_med) +
+  theme_classic() +
+  labs(title = "Top 10 Counties by Frequency", 
+       x = "County", 
+       y = "Number of Fires") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_line(color = "grey90")
+  )
+
+# 4. Plot by Municipality (Top 10)
+p3 <- ggplot(top_10_municipalities, aes(x = reorder(municipio, -n), y = n)) +
+  geom_bar(stat = "identity", fill = blue_light) +
+  theme_classic() +
+  labs(title = "Top 10 Municipalities by Frequency", 
+       x = "Municipality", 
+       y = "Number of Fires") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    plot.title = element_text(size = 11, face = "bold", hjust = 0.5),
+    panel.grid.major.y = element_line(color = "grey90")
+  )
+
+# 5. Final Layout Assembly (2+1 distribution)
+final_plot <- (p1 + p2) / p3 + 
+  plot_annotation(
+    title = 'Spatial Distribution of Wildfires in Catalonia',
+    subtitle = 'Historical Analysis (1998-2022)',
+    caption = 'Source: Dataset compiled for TFM analysis',
+    theme = theme(
+      plot.title = element_text(size = 16, hjust = 0.5, face = "bold", margin = margin(b = 10)),
+      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "grey30")
+    )
+  )
+
+# Display the plot
+print(final_plot)
+```
+
+```{r}
+# 2. Data Preparation
+# 2.1. Yearly Data: Convert year to numeric to avoid factor errors in scales
+yearly_counts <- wfc_final2 %>%
+  count(year) %>%
+  mutate(year = as.numeric(as.character(year)))
+
+# 2.2. Monthly Data: Define chronological order for the factor
+wfc_final2$month_detected <- factor(wfc_final2$month_detected, 
+                                    levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+
+monthly_counts <- wfc_final2 %>%
+  count(month_detected)
+
+# 3. Create Plots
+
+# Plot A: Yearly Evolution (Line & Points)
+p_year <- ggplot(yearly_counts, aes(x = year, y = n)) +
+  geom_line(color = "darkred", size = 1) +
+  geom_point(color = "darkred", size = 2) +
+  # Force X-axis to show every single year vertically
+  scale_x_continuous(breaks = seq(min(yearly_counts$year), max(yearly_counts$year), by = 1)) +
+  theme_minimal() +
+  labs(title = "Annual Fire Frequency Evolution", 
+       subtitle = "1998 - 2022 Historical Series",
+       x = "Year", 
+       y = "Number of Fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1) # Vertical labels
+  )
+
+# Plot B: Monthly Seasonality (Bar Chart)
+p_month <- ggplot(monthly_counts, aes(x = month_detected, y = n, group = 1)) +
+  geom_bar(stat = "identity", fill = "indianred3") +
+  theme_minimal() +
+  labs(title = "Monthly Fire Seasonality", 
+       subtitle = "Aggregated Frequency (1998-2022)",
+       x = "Month", 
+       y = "Number of Fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# 4. Final Layout Assembly
+# Side-by-side distribution using patchwork
+final_temporal_plot <- p_year + p_month + 
+  plot_annotation(
+    title = 'Temporal Analysis of Wildfires in Catalonia',
+    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold"))
+  )
+
+# 5. Display the result
+print(final_temporal_plot)
+
+```
+
+
+```{r}
+# 1. Data Preparation
+# Top 10 Causes (Ordered for horizontal display)
+top_10_causes <- wfc_final2 %>%
+  count(causa) %>%
+  slice_max(n, n = 10)
+
+# Land Cover Frequency (Ordered for horizontal display)
+land_cover_freq <- wfc_final2 %>%
+  count(land_cover_id) %>%
+  filter(!is.na(land_cover_id))
+
+# Define Professional Blue Palette
+blue_deep  <- "#084594"
+blue_soft  <- "#4292c6"
+
+# 2. Plot: Fire Frequency by Land Cover (Horizontal)
+p6 <- ggplot(land_cover_freq, aes(x = reorder(land_cover_id, n), y = n)) +
+  geom_bar(stat = "identity", fill = blue_deep) +
+  coord_flip() + # Flip coordinates to horizontal
+  theme_classic() +
+  labs(title = "Fire Frequency by Land Cover Type",
+       x = "Land Cover Class",
+       y = "Number of Fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    panel.grid.major.x = element_line(color = "grey95") # Grid on X axis now
+  )
+
+# 3. Plot: Top 10 Fire Causes (Horizontal)
+p7 <- ggplot(top_10_causes, aes(x = reorder(causa, n), y = n)) +
+  geom_bar(stat = "identity", fill = blue_soft) +
+  coord_flip() + # Flip coordinates to horizontal
+  theme_classic() +
+  labs(title = "Top 10 Wildfire Causes",
+       x = "Cause Description",
+       y = "Number of Fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold", hjust = 0.5),
+    axis.text.y = element_text(size = 9), # Easier to read horizontally
+    panel.grid.major.x = element_line(color = "grey95")
+  )
+
+p6
+p7
+```
+
 
 ```{r}
 # 2. Save the dataframe as a CSV file
@@ -646,4 +826,4 @@ message("File successfully saved in: data/wfc_final2.csv")
 ```
 
 
-
+un amb els anys posats de manera consecutiva; un amb els mesos consecutius també; un amb tots els land covers
