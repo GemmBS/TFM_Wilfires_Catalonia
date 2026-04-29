@@ -25,8 +25,8 @@ library(crosstalk)
 # 1. Data Preparation
 wfc_map_data <- wfc_final2 %>%
   mutate(
-    # Ensure year is a factor for the dropdown selector
-    year_factor = as.factor(year),
+    # Year MUST be numeric for the slider to work correctly
+    year_num = as.numeric(as.character(year)),
     # Create the customized popup text in English
     popup_text = paste0(
       "<div style='font-family: Arial; font-size: 12px;'>",
@@ -37,26 +37,29 @@ wfc_map_data <- wfc_final2 %>%
       "<strong>Cause:</strong> ", causa, "</div>"
     )
   ) %>%
-  select(longitude, latitude, year_factor, popup_text, superficie_total_forestal, municipio)
+  select(longitude, latitude, year_num, popup_text, superficie_total_forestal, municipio)
 
 # 2. Create SharedData object
 sd <- SharedData$new(wfc_map_data)
 
-# 3. Map layout with single year filter
+# 3. Interactive Layout with Slider
 bscols(
   widths = c(12),
-  # Year selector (dropdown)
-  filter_select(
-    id = "year_selector", 
-    label = "Select a specific year to visualize wildfires:", 
+  # Year Slider
+  filter_slider(
+    id = "year_slider", 
+    label = "Slide to navigate through years (1998-2022):", 
     sharedData = sd, 
-    group = ~year_factor,
-    multiple = FALSE  # Ensures only one year is shown at a time
+    column = ~year_num,
+    step = 1,          # Move year by year
+    ticks = TRUE,      # Show year marks
+    sep = "",          # Avoid commas in years (e.g., 2,022 -> 2022)
+    width = "100%"
   ),
-  # Leaflet Map with light background
-  leaflet(sd, width = "100%", height = 650) %>%
+  # Leaflet Map
+  leaflet(sd, width = "100%", height = 700) %>%
     addTiles() %>% 
-    addProviderTiles(providers$CartoDB.Positron) %>% # Clean white/light background
+    addProviderTiles(providers$CartoDB.Positron) %>%
     addCircleMarkers(
       lng = ~longitude, 
       lat = ~latitude,
@@ -66,9 +69,11 @@ bscols(
       weight = 1,
       fillOpacity = 0.7,
       popup = ~popup_text,
-      label = ~paste(municipio, "-", superficie_total_forestal, "ha") # Hover label
+      label = ~paste(municipio, "-", superficie_total_forestal, "ha")
     )
 )
 ```
+
+
 
 
