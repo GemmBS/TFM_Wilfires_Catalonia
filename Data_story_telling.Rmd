@@ -1,11 +1,17 @@
 ---
-title: "Catalonia Fire Storyboard"
+title: "Unveiling wildfire patterns in Catalonia (1998-2022)"
+author: "Gemma Bargalló Solé"
+date: "`r Sys.Date()`"
 output: 
   flexdashboard::flex_dashboard:
     storyboard: true
+    theme: cosmo
+    vertical_layout: fill
 ---
 
-```{r}
+```{r warning=FALSE, message=FALSE}
+# 1. packages import
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(tidyverse)
 library(nanoparquet)
 library(here)
@@ -21,25 +27,122 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(gridExtra)
-```
+library(leaflet)
+library(dplyr)
+library(crosstalk)
+library(shiny)
+library(shinydashboard)  
 
-# 1. Data Import
-
-```{r}
-# Final dataset import
+# 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
 ```
 
+# 1. Introduction: The fire challenge in Catalonia
+
+Wildfires are one of the most significant environmental threats in Catalonia. As climate change intensifies and traditional land management fades, the Mediterranean landscape becomes increasingly vulnerable.
+
+![Source: [El Periódico (2021). Wildfire risk factors in Catalonia.](https://www.elperiodico.cat/ca/successos/20210709/tres-claus-risc-incendis-forestals-11897390)](images/incendis%20catalunya.jpg){width="100%"}
+
+## The objectives of this visualization:
+
+-   **Identify spatio-temporal patterns**: To understand not just when it burns, but where the recurrence is highest.
+
+-   **Correlate causes and landscape**: To see how human activity and land cover types interact to create risk.
+
+-   **Bridge descriptive and predictive analysis**: To provide a visual foundation that justifies the variables used in our Random Forest predictive model.
+
+"*Data is the first step toward effective prevention. By visualizing the past 25 years, we can better prepare for the next season.*"
+
+```{r}
+# In this first section, we can show a summary "Value Box" 
+# to show the total magnitude of the dataset.
+total_fires <- nrow(wfc_final2)
+total_area <- sum(wfc_final2$superficie_total_forestal, na.rm = TRUE)
+
+# Custom display using valueBoxes
+fluidRow(
+  valueBox(total_fires, subtitle = "Total Fires Recorded", icon = icon("fire"), color = "red"),
+  valueBox(round(total_area / 1000, 1), subtitle = "Total Thousand Ha Burnt", icon = icon("tree"), color = "yellow")
+)
+```
+
+# 2. Chapter 1: The pulse of time (temporal analysis)
+
+### Understanding 25 years of Fire History {data-commentary-width="350"}
+
+```{r warning=FALSE, message=FALSE}
+# 2. Data Preparation
+# 2.1. Yearly Data: Convert year to numeric to avoid factor errors in scales
+yearly_counts <- wfc_final2 %>%
+  count(year) %>%
+  mutate(year = as.numeric(as.character(year)))
+
+# 2.2. Monthly Data: Define chronological order for the factor
+wfc_final2$month_detected <- factor(wfc_final2$month_detected, 
+                                    levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"))
+
+monthly_counts <- wfc_final2 %>%
+  count(month_detected)
+
+# 3. Create Plots
+
+# Plot A: Yearly Evolution with Trend Line
+p_year <- ggplot(yearly_counts, aes(x = year, y = n)) +
+  # Add the trend line (Linear Regression)
+  geom_smooth(method = "lm", color = "steelblue", linetype = "dashed", size = 0.8, se = FALSE) +
+  # Keep the actual data points and lines
+  geom_line(color = "darkred", size = 1) +
+  geom_point(color = "darkred", size = 2) +
+  # Force X-axis to show every single year vertically
+  scale_x_continuous(breaks = seq(min(yearly_counts$year), max(yearly_counts$year), by = 1)) +
+  theme_minimal() +
+  labs(title = "Annual fire frequency evolution", 
+       subtitle = "1998 - 2022 Historical Series with Linear Trend",
+       x = "Year", 
+       y = "Number of Fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1) # Vertical labels
+  )
+
+# Plot B: Monthly Seasonality (Bar Chart)
+p_month <- ggplot(monthly_counts, aes(x = month_detected, y = n, group = 1)) +
+  geom_bar(stat = "identity", fill = "indianred3") +
+  theme_minimal() +
+  labs(title = "Monthly fire seasonality", 
+       subtitle = "Aggregated frequency (1998-2022)",
+       x = "Month", 
+       y = "Number of fires") +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# 4. Final Layout Assembly
+# Side-by-side distribution using patchwork
+final_temporal_plot <- p_year + p_month + 
+  plot_annotation(
+    title = 'Temporal analysis of wildfires in Catalonia',
+    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold"))
+  )
+
+# 5. Display the result
+print(final_temporal_plot)
+
+```
+
+To understand the current risk, we must look at the historical series (1998-2022). As stated in the literature:
+
+- **Interannual variability**: Wildfires in Catalonia are episodic. Years like 1998, 2005, 2009 and 2012 represent critical thresholds of drought and heat.
+
+- **The seasonal double peak**: While summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires.
+
+- **A slow descent**: We observe a slight decrease in ignitions over time, reflecting more efficient detection and prevention measures.
 
 ```{r}
 # MAP
-
-# Load libraries
-library(leaflet)
-library(dplyr)
-library(crosstalk)
-
 # 1. Data Preparation
 wfc_map_data <- wfc_final2 %>%
   mutate(
@@ -91,7 +194,3 @@ bscols(
     )
 )
 ```
-
-
-
-
