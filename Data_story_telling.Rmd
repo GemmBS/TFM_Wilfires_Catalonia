@@ -131,17 +131,6 @@ final_temporal_plot <- p_year + p_month +
 # 5. Display the result
 print(final_temporal_plot)
 
-```
-
-To understand the current risk, we must look at the historical series (1998-2022). As stated in the literature:
-
-- **Interannual variability**: Wildfires in Catalonia are episodic. Years like 1998, 2005, 2009 and 2012 represent critical thresholds of drought and heat.
-
-- **The seasonal double peak**: While summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires.
-
-- **A slow descent**: We observe a slight decrease in ignitions over time, reflecting more efficient detection and prevention measures.
-
-```{r}
 # 1. Prepare the data
 table_data <- wfc_final2 %>%
   group_by(year) %>%
@@ -179,8 +168,18 @@ fire_table <- table_data %>%
   )
 
 fire_table
+
 ```
 
+To understand the current risk, we must look at the historical series (1998-2022). As shown in the Annual Wildfire Summary table and the temporal plots:
+
+-   **Interannual variability**: Wildfires in Catalonia are episodic. The table highlights that years like 1998 and 2012 are not just frequency peaks but true ecological disasters, with 20,992 ha and 15,026 ha burnt respectively. These represent critical thresholds of drought and heat.
+
+-   **Frequency vs. severity:** By comparing the line chart with the table, we notice an interesting pattern: a high number of fires (like in 2005 with 894 ignitions) doesn't always correlate with the largest burnt area (5,495 ha), suggesting that fire suppression efficiency varies depending on meteorological synoptics.
+
+-   **The seasonal double peak**: While the bar chart shows summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires, a factor to be further analyzed in the "Causes" section.
+
+-   **A slow descent**: The blue trend line in the plot, supported by the lower figures in the last decade of the table (e.g., 2018 or 2020), reflects a slight decrease in ignitions over time. This trend suggests that prevention measures are mitigating the increasing climatic risk.
 
 # 3. Chapter 2: The core of the story (interactive exploration)
 
@@ -274,7 +273,6 @@ wfc_final2 <- wfc_final2 %>%
   left_join(land_cover_lookup, by = "land_cover_id")
 ```
 
-
 ```{r}
 # MAP
 # 1. Data Preparation for Leaflet
@@ -339,11 +337,8 @@ bscols(
 
 This interactive map bridges the gap between raw data and territorial management:
 
-- **Regional pressure**: You can visually confirm the high density of events in the Barcelona Metropolitan Area and the Empordà.
+-   **Regional pressure**: You can visually confirm the high density of events in the Barcelona Metropolitan Area and the Empordà.
 
-- **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
+-   **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
 
-- **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
-
-
-
+-   **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
