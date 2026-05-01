@@ -12,6 +12,36 @@ html_document:
   pdf_document: default
 ---
 
+```{r}
+library(tidyverse)
+library(nanoparquet)
+library(here)
+library(scales)
+library(naniar) 
+library(skimr) 
+library(patchwork)
+library(VIM)
+library(gt)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(gridExtra)
+library(leaflet)
+library(dplyr)
+library(crosstalk)
+library(shiny)
+library(shinydashboard)  
+library(plotly)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(caret)
+library(ranger)
+library(pROC)
+```
+
 
 # 1. Data Import
 
@@ -20,9 +50,9 @@ html_document:
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
 ```
-
-# 2. Pre-processing and Feature Engineering
-## 2.1 Data Cleaning and Feature Selection
+# 2. Quantitative Analysis of Fire Severity: A Random Forest Regression Approach to Burnt Area Prediction.
+## 2.1 Pre-processing and Feature Engineering
+### 2.1.1 Data Cleaning and Feature Selection
 In this step, we filter the columns, handle categorical variables as factors, and prepare the dataset for the model.
 
 ```{r}
@@ -65,8 +95,7 @@ wfc_model_final <- wfc_final2 %>%
 ```
 
 
-
-## 2.2 Correlation Analysis
+### 2.1.2 Correlation Analysis
 
 We use Spearman correlation because your previous histograms showed that the numerical variables are not normally distributed.
 
@@ -88,7 +117,7 @@ cor_matrix
 ```
 
 
-## 2.3 Target Variable Transformation
+### 2.1.3 Target Variable Transformation
 
 Since the burnt surface is highly skewed (most fires are small, few are huge), we apply a Logarithmic transformation to stabilize the variance.
 
@@ -105,7 +134,7 @@ par(mfrow=c(1,1))
 ```
 
 
-## 2.4 Data Splitting (Training and Testing)
+### 2.1.4 Data Splitting (Training and Testing)
 
 We split the data into an 80% Training set and a 20% Test set.
 
@@ -126,7 +155,7 @@ message("Testing set rows: ", nrow(test_set))
 ```
 
 
-# 3. Random Forest Model
+## 2.3 Random Forest Model: Regression Approach to Burnt Area Prediction
 
 ```{r}
 # Install and load ranger if you haven't
@@ -174,5 +203,64 @@ postResample(pred = predictions, obs = test_set$log_surface)
 ```
 
 
+# 3. Predictive Modeling of Fire Susceptibility: A Binary Classification Framework via Ensemble Learning.
+## 3.1 Pre-processing and Feature Engineering
+### 3.1.4 Data Splitting (Training and Testing)
 
+```{r}
+# Creem la classe binària (Severity) seguint Mitsopoulos et al. (2019)
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 10, "High", "Low"))
+
+# 1. Separació inicial (Hold-out)
+set.seed(123)
+train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+```
+
+
+```{r}
+# 1. Afegim 'sampling = "down"' al trainControl
+fitControl <- trainControl(
+  method = "cv",
+  number = 10,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = "final",
+  sampling = "down" 
+)
+
+rf_final_model <- train(
+  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + county_clean + latitude + longitude + month_detected + hour_detected + year + afecto_zonas_interfaz_urbano_forestal,
+  data = train_set,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "ROC", # El model triarà els millors paràmetres basant-se en l'AUC
+  importance = "permutation"
+)
+```
+
+```{r}
+# Prediccions sobre el test_set (dades mai vistes)
+final_preds <- predict(rf_final_model, newdata = test_set)
+final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+
+# 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
+conf_matrix <- confusionMatrix(final_preds, test_set$severity)
+print(conf_matrix)
+
+# 2. AUC-ROC (per a la teva "discriminative power" del punt 2.6.4)
+roc_obj <- roc(test_set$severity, final_probs$High)
+auc_value <- auc(roc_obj)
+print(paste("AUC final del model:", auc_value))
+```
+
+```{r}
+# 1. Extraure la importància
+importancia_data <- varImp(rf_final_model, scale = FALSE)
+
+# 2. Seleccionar només les, per exemple, 10 més importants
+# Això farà que el gràfic sigui molt més net i entenedor
+plot(importancia_data, top = 10, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
+```
 
