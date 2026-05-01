@@ -141,6 +141,46 @@ To understand the current risk, we must look at the historical series (1998-2022
 
 - **A slow descent**: We observe a slight decrease in ignitions over time, reflecting more efficient detection and prevention measures.
 
+```{r}
+# 1. Prepare the data
+table_data <- wfc_final2 %>%
+  group_by(year) %>%
+  summarise(
+    Total_Fires = n(),
+    Total_Area_Ha = sum(superficie_total_forestal, na.rm = TRUE)
+  ) %>%
+  arrange(year)
+
+# 2. Create the corrected gt table
+fire_table <- table_data %>%
+  gt() %>%
+  tab_header(
+    title = md("**Annual wildfire summary**"),
+    subtitle = "Frequency and Burnt Surface (1998-2022)"
+  ) %>%
+  cols_label(
+    year = "Year",
+    Total_Fires = "Number of Fires",
+    Total_Area_Ha = "Total Area (ha)"
+  ) %>%
+  fmt_number(
+    columns = c(Total_Fires, Total_Area_Ha),
+    decimals = 1,
+    use_seps = TRUE
+  ) %>%
+  # Updated styling method
+  tab_style(
+    style = cell_fill(color = "#F9F9F9"),
+    locations = cells_column_labels()
+  ) %>%
+  tab_options(
+    table.width = pct(100),
+    column_labels.font.weight = "bold"
+  )
+
+fire_table
+```
+
 
 # 3. Chapter 2: The core of the story (interactive exploration)
 
@@ -305,43 +345,5 @@ This interactive map bridges the gap between raw data and territorial management
 
 - **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
 
-```{r}
-# 1. Prepare the data
-table_data <- wfc_final2 %>%
-  group_by(year) %>%
-  summarise(
-    Total_Fires = n(),
-    Total_Area_Ha = sum(superficie_total_forestal, na.rm = TRUE)
-  ) %>%
-  arrange(year)
 
-# 2. Create the corrected gt table
-fire_table <- table_data %>%
-  gt() %>%
-  tab_header(
-    title = md("**Annual wildfire summary**"),
-    subtitle = "Frequency and Burnt Surface (1998-2022)"
-  ) %>%
-  cols_label(
-    year = "Year",
-    Total_Fires = "Number of Fires",
-    Total_Area_Ha = "Total Area (ha)"
-  ) %>%
-  fmt_number(
-    columns = c(Total_Fires, Total_Area_Ha),
-    decimals = 1,
-    use_seps = TRUE
-  ) %>%
-  # Updated styling method
-  tab_style(
-    style = cell_fill(color = "#F9F9F9"),
-    locations = cells_column_labels()
-  ) %>%
-  tab_options(
-    table.width = pct(100),
-    column_labels.font.weight = "bold"
-  )
-
-fire_table
-```
 
