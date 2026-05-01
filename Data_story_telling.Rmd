@@ -39,7 +39,7 @@ wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
 ```
 
-# 1. Introduction: The fire challenge in Catalonia
+# Introduction: The fire challenge in Catalonia
 
 Wildfires are one of the most significant environmental threats in Catalonia. As climate change intensifies and traditional land management fades, the Mediterranean landscape becomes increasingly vulnerable.
 
@@ -68,7 +68,7 @@ fluidRow(
 )
 ```
 
-# 2. Chapter 1: The pulse of time (temporal analysis)
+# Chapter 1: The pulse of time (temporal analysis)
 
 ### Understanding 25 years of Fire History {data-commentary-width="350"}
 
@@ -190,7 +190,7 @@ fire_table %>%
 
 ```
 
-# 3. Chapter 2: The core of the story (interactive exploration)
+# Chapter 2: The core of the story (interactive exploration)
 
 ```{r}
 wfc_final2 <- wfc_final2 %>%
@@ -449,7 +449,7 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 -   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
 
-# 4. Chapter 3: Land Cover and ecosystem vulnerability
+# Chapter 3: Land Cover and ecosystem vulnerability
 
 ```{r}
 # 1. Preparació de dades 
@@ -530,7 +530,7 @@ The analysis of wildfire impact across different land cover types reveals a crit
 
 -   **Urban and infrastructure pressure**: The appearance of the Road network and Urban expansion in the burnt area rankings highlights the increasing risk at the Wildland-Urban Interface (WUI), where human activity acts as a primary driver of landscape transformation through fire.
 
-# 5. Chapter 4: Analysis of ignition sources and drivers
+# Chapter 4: Analysis of ignition sources and drivers
 
 ```{r}
 # 1. Preparació de dades de causes (Top 15)
@@ -602,3 +602,53 @@ The investigation into the origins of wildfires in Catalonia (1998-2022) reveals
 -   **Natural vs. anthropogenic origins**: Lightning ("[100] Rayo") is the most frequent natural cause (**1,477 fires**). However, its impact on the total burnt area (**5,029 ha**) is considerably lower than that of intentional or negligent human acts. This confirms that wildfires in Catalonia are, fundamentally, a human-driven phenomenon.
 
 -   **The challenge of uncertainty**: The high volume of "[500] Desconocida" cases (**1,809 ignitions**) points toward the difficulty of post-fire forensic investigation. Reducing this statistical "noise" is essential for improving targeted prevention measures.
+
+# Chapter 5: The climate change and thermal extremes
+
+
+```{r warning=FALSE, message=FALSE}
+# 2. Afegim una columna de text personalitzada per al "tooltip" (el que es llegirà en passar el ratolí)
+# Això farà que la interacció sigui molt més informativa.
+wfc_final2 <- wfc_final2 %>%
+  mutate(text_interactiu = paste0("Municipi: ", municipio, 
+                                  "<br>Any: ", year,
+                                  "<br>Temp. Máxima (TX): ", tx, "°C",
+                                  "<br>Superfície: ", comma(superficie_total_forestal), " ha",
+                                  "<br>Amplitud Tèrmica: ", round(thermal_amplitude, 1), "°C"))
+
+# 3. Creem el ggplot assignant el text al paràmetre 'text'
+p_clima <- ggplot(wfc_final2, aes(x = tx, y = superficie_total_forestal, text = text_interactiu)) +
+  geom_point(aes(color = thermal_amplitude), alpha = 0.5, size = 2) +
+  scale_y_log10(labels = scales::comma) + 
+  scale_color_viridis_c(option = "inferno", name = "Thermal Amplitude") +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    title = "The heat threshold: Max temperature vs. fire severity",
+    x = "Maximum temperature (TX) at ignition (°C)",
+    y = "Total burnt area (ha) [log10]"
+  )
+
+# 4. Convertim a gràfic interactiu
+# L'argument tooltip="text" fa que només es mostri la nostra etiqueta personalitzada
+ggplotly(p_clima, tooltip = "text")
+```
+
+
+In the Mediterranean basin, climate change acts as a "force multiplier." It does not necessarily increase the number of ignitions---which remain largely anthropogenic---but it drastically alters the environment's receptivity to fire. This chapter analyzes how thermal thresholds dictate the transition from routine fire events to uncontrollable Large Wildfires.
+
+## Thermal thresholds and fire severity
+
+The relationship between **Maximum Temperature (TX)** and the **total burnt area** provides a clear visualization of the "heat threshold".
+
+-   **The 30°C inflection point**: Statistical density increases significantly when TX exceeds 30°C. While suppression forces are highly effective at lower temperatures, the "ceiling" of fire size rises exponentially once this thermal barrier is crossed.
+
+-   **The extremes vs. the average**: Although the linear trend of fire size remains relatively stable across the temperature spectrum due to efficient initial attack, the most severe events (\>500 ha) are exclusively concentrated in the high-temperature range. This confirms that extreme heat creates a "window of opportunity" for fires to escape suppression.
+
+## Thermal amplitude and fuel desiccation
+
+The variable **`thermal_amplitude`** serves as a critical proxy for relative humidity and atmospheric stability.
+
+-   **Atmospheric dryness**: High amplitude values (where $TX - TN > 20°C$) are strongly correlated with the most impactful wildfires in the 25-year series.
+
+-   **Fire intensity**: Fires occurring under high thermal amplitude conditions exhibit higher flame lengths and faster rates of spread, as the low overnight recovery (**TN**) prevents the fuel from regaining moisture.
