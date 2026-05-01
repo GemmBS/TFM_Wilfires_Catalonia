@@ -3,10 +3,10 @@ title: "Unveiling wildfire patterns in Catalonia (1998-2022)"
 author: "Gemma Bargalló Solé"
 date: "`r Sys.Date()`"
 output: 
-  flexdashboard::flex_dashboard:
-    storyboard: true
+  html_document:
+    toc: true
+    toc_float: true
     theme: cosmo
-    vertical_layout: fill
 ---
 
 ```{r warning=FALSE, message=FALSE}
@@ -72,7 +72,7 @@ fluidRow(
 
 ### Understanding 25 years of Fire History {data-commentary-width="350"}
 
-```{r warning=FALSE, message=FALSE}
+```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
 # 2. Data Preparation
 # 2.1. Yearly Data: Convert year to numeric to avoid factor errors in scales
 yearly_counts <- wfc_final2 %>%
@@ -131,7 +131,21 @@ final_temporal_plot <- p_year + p_month +
 
 # 5. Display the result
 print(final_temporal_plot)
+```
 
+To understand the current risk, we must look at the historical series (1998-2022). As shown in the Annual Wildfire Summary table and the temporal plots:
+
+-   **Interannual variability**: Wildfires in Catalonia are episodic. The table highlights that years like 1998 and 2012 are not just frequency peaks but true ecological disasters, with 20,992 ha and 15,026 ha burnt respectively. These represent critical thresholds of drought and heat.
+
+-   **Frequency vs. severity:** By comparing the line chart with the table, we notice an interesting pattern: a high number of fires (like in 2005 with 894 ignitions) doesn't always correlate with the largest burnt area (5,495 ha), suggesting that fire suppression efficiency varies depending on meteorological synoptics.
+
+-   **The seasonal double peak**: While the bar chart shows summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires, a factor to be further analyzed in the "Causes" section.
+
+-   **A slow descent**: The blue trend line in the plot, supported by the lower figures in the last decade of the table (e.g., 2018 or 2020), reflects a slight decrease in ignitions over time. This trend suggests that prevention measures are mitigating the increasing climatic risk.
+
+### Detailed annual data
+
+```{r}
 # 1. Prepare the data
 table_data <- wfc_final2 %>%
   group_by(year) %>%
@@ -168,19 +182,13 @@ fire_table <- table_data %>%
     column_labels.font.weight = "bold"
   )
 
-fire_table
+fire_table %>%
+  tab_options(
+    container.height = px(400), 
+    container.overflow.y = TRUE 
+  )
 
 ```
-
-To understand the current risk, we must look at the historical series (1998-2022). As shown in the Annual Wildfire Summary table and the temporal plots:
-
--   **Interannual variability**: Wildfires in Catalonia are episodic. The table highlights that years like 1998 and 2012 are not just frequency peaks but true ecological disasters, with 20,992 ha and 15,026 ha burnt respectively. These represent critical thresholds of drought and heat.
-
--   **Frequency vs. severity:** By comparing the line chart with the table, we notice an interesting pattern: a high number of fires (like in 2005 with 894 ignitions) doesn't always correlate with the largest burnt area (5,495 ha), suggesting that fire suppression efficiency varies depending on meteorological synoptics.
-
--   **The seasonal double peak**: While the bar chart shows summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires, a factor to be further analyzed in the "Causes" section.
-
--   **A slow descent**: The blue trend line in the plot, supported by the lower figures in the last decade of the table (e.g., 2018 or 2020), reflects a slight decrease in ignitions over time. This trend suggests that prevention measures are mitigating the increasing climatic risk.
 
 # 3. Chapter 2: The core of the story (interactive exploration)
 
@@ -290,14 +298,14 @@ wfc_map_data <- wfc_final2 %>%
       "<strong>Detected:</strong> ", date_detected, "<br>",
       "<strong>Extinguished:</strong> ", date_extinguished, "<br>",
       "<strong>Burnt Surface:</strong> ", superficie_total_forestal, " ha<br>",
-      "<strong>Land Cover Type:</strong> ", land_cover_desc, "<br>",
+      "<strong>Land Cover Type:</strong> ", land_cover_type, "<br>",
       "<strong>Cause:</strong> ", causa, 
       "</div>"
     )
   ) %>%
   # Seleccionem les variables necessàries i traiem el land_cover_id
   select(longitude, latitude, year_num, popup_text, superficie_total_forestal, 
-         municipio, date_detected, date_extinguished, land_cover_desc)
+         municipio, date_detected, date_extinguished, land_cover_type)
 
 # 2. Create SharedData object
 sd <- SharedData$new(wfc_map_data)
@@ -334,6 +342,7 @@ bscols(
 )
 ```
 
+
 ### Where does Catalonia burn?
 
 This interactive map bridges the gap between raw data and territorial management:
@@ -347,7 +356,7 @@ This interactive map bridges the gap between raw data and territorial management
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
 
-```{r}
+```{r r warning=FALSE, message=FALSE, fig.height=14, fig.width=12}
 # 1. Preparació de dades (Top 10)
 top_10_muni_freq <- wfc_final2 %>%
   count(municipio) %>%
@@ -444,15 +453,15 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 # 4. Chapter 3: Land Cover and Ecosystem Vulnerability
 
-```{r}
+```{r message=FALSE, fig.height=14, fig.width=12}
 # 1. Preparació de dades
 land_cover_summary <- wfc_final2 %>%
-  group_by(land_cover_desc) %>%
+  group_by(land_cover_type) %>%
   summarise(
     frequency = n(),
     total_area = sum(superficie_total_forestal, na.rm = TRUE)
   ) %>%
-  filter(land_cover_desc != "No data")
+  filter(land_cover_type != "No data")
 
 top_10_lc_freq <- land_cover_summary %>% slice_max(frequency, n = 10)
 top_10_lc_area <- land_cover_summary %>% slice_max(total_area, n = 10)
@@ -476,9 +485,9 @@ estil_forestal <- function() {
 # --- GRÀFICS "TREE-STYLE" (Lollipop Charts) ---
 
 # P5: Fire frequency by land cover type
-p5 <- ggplot(top_10_lc_freq, aes(x = reorder(land_cover_desc, -frequency), y = frequency)) +
+p5 <- ggplot(top_10_lc_freq, aes(x = reorder(land_cover_type, -frequency), y = frequency)) +
   # El "tronc" de l'arbre
-  geom_segment(aes(xend = reorder(land_cover_desc, -frequency), yend = 0), 
+  geom_segment(aes(xend = reorder(land_cover_type, -frequency), yend = 0), 
                color = trunk_color, size = 1.5) +
   # La "copa" de l'arbre (el punt de dalt)
   geom_point(size = 8, color = tree_color) +
@@ -491,9 +500,9 @@ p5 <- ggplot(top_10_lc_freq, aes(x = reorder(land_cover_desc, -frequency), y = f
   estil_forestal()
 
 # P6: Total burnt area by land cover type
-p6 <- ggplot(top_10_lc_area, aes(x = reorder(land_cover_desc, -total_area), y = total_area)) +
+p6 <- ggplot(top_10_lc_area, aes(x = reorder(land_cover_type, -total_area), y = total_area)) +
   # El "tronc" de l'arbre
-  geom_segment(aes(xend = reorder(land_cover_desc, -total_area), yend = 0), 
+  geom_segment(aes(xend = reorder(land_cover_type, -total_area), yend = 0), 
                color = trunk_color, size = 1.5) +
   # La "copa" de l'arbre
   geom_point(size = 8, color = tree_color) +
