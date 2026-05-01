@@ -75,7 +75,7 @@ fluidRow(
 
 # Chapter 1: The pulse of time (temporal analysis)
 
-### Understanding 25 years of Fire History {data-commentary-width="350"}
+### Understanding 25 years of fire history {data-commentary-width="350"}
 
 ```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
 # 2. Data Preparation
@@ -454,7 +454,68 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 -   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
 
-# Chapter 3: Land Cover and ecosystem vulnerability
+# Chapter 3: The meteorological dimension
+
+```{r warning=FALSE, message=FALSE}
+# Gràfic de densitat: On es concentren els incendis segons Clima?
+ggplot(wfc_final2, aes(x = tx, y = ppt)) +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", color = "white") +
+  geom_point(aes(size = superficie_total_forestal), alpha = 0.2, color = "orange") +
+  scale_fill_viridis_c(option = "magma", name = "Density") +
+  scale_size_continuous(range = c(1, 10), name = "Area (ha)") +
+  theme_minimal() +
+  labs(
+    title = "Meteorological fingerprint of wildfires",
+    subtitle = "Interaction between Max Temperature (TX) and Precipitation (PPT)",
+    x = "Max Temperature (°C)",
+    y = "Precipitation (mm)"
+  )
+```
+
+### TX and PPT Interaction
+
+The scatter plot and density analysis presented in the previous plot illustrate the climatic envelope in which wildfires occur in Catalonia. This "fingerprint" reveals a critical dependence on specific atmospheric conditions for fire spread and intensification.
+
+-   **The zero-precipitation constraint**: A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density heatmap (indicated by the lighter yellow tones) confirms that the vast majority of fires occur under conditions of absolute lack of immediate rainfall. This confirms that while a fire can start at various temperatures, it rarely prospers or even occurs if there is significant moisture from recent precipitation.
+
+-   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 20°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges due to fuel volatility.
+
+-   **Atmospheric "Dry windows"**: There are occasional ignitions at higher precipitation levels (up to 60-70 mm), but these remain isolated, small-scale events (dots with almost no radius). This suggests that even if an ignition occurs during a rainy period, the lack of fuel continuity or the high fuel moisture content prevents the fire from gaining significant size.
+
+-   **Operational implications**: The "Meteorological Fingerprint" suggests that the risk is not linear but threshold-based. Once precipitation reaches 0 mm and temperature crosses the 30°C mark, the landscape enters a state of high receptivity where any anthropogenic ignition (as we will analyze in Chapter 5) has a high probability of becoming a high-impact event.
+
+```{r warning=FALSE, message=FALSE}
+# Evolució de la TX mitjana per any
+climate_evolution <- wfc_final2 %>%
+  group_by(year) %>%
+  summarise(avg_tx = mean(tx, na.rm = TRUE))
+
+ggplot(climate_evolution, aes(x = year, y = avg_tx)) +
+  geom_line(color = "red", size = 1) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", linetype = "dashed", color = "darkred") +
+  theme_minimal() +
+  labs(
+    title = "Thermal evolution of fire days (1998-2022)",
+    subtitle = "Annual average of TX during ignition events",
+    x = "Year",
+    y = "Average Maximum Temperature (°C)"
+  )
+```
+
+### Temporal trends: the warming of fire days (1998-2022)
+
+The historical evolution of the average maximum temperature (**TX**) during ignition events, as illustrated in the previous plot, provides a direct signal of climate change's influence on the regional fire regime.
+
+-   **Positive linear trend**: The dashed regression line shows a steady upward trend over the 25-year period. This indicates that, on average, wildfires in Catalonia are occurring under increasingly hotter conditions. Even if the slope appears gradual, in ecological terms, a consistent rise in the thermal baseline significantly reduces fuel moisture and expands the annual "fire window."
+
+-   **Interannual volatility**: The red line shows high variability, with extreme thermal peaks such as the one recorded in **2003** (surpassing 30°C on average). This specific peak correlates with one of the most severe heatwaves in European history, which led to catastrophic wildfire seasons in the Mediterranean. Similar, though less extreme, peaks are visible in **2006**, **2009**, and more recently in the **2017-2020** period.
+
+-   **A new thermal plateau**: It is noteworthy that since 2015, the annual average **TX** for fire days has rarely dropped below 26°C, whereas in the first decade of the series (1998-2008), values below 25°C were much more frequent. This suggests a "thermal hardening" of the environment, where the minimum conditions required for fire propagation are becoming more extreme.
+
+-   **The confidence interval**: The grey shaded area (confidence interval) widening towards the end of the series reflects the increasing unpredictability and frequency of extreme events. While some years still show lower averages due to specific rainy summers, the overall trajectory is towards a hotter ignitions environment.
+
+# Chapter 4: Land cover and ecosystem vulnerability
 
 ```{r}
 # 1. Preparació de dades 
@@ -535,7 +596,7 @@ The analysis of wildfire impact across different land cover types reveals a crit
 
 -   **Urban and infrastructure pressure**: The appearance of the Road network and Urban expansion in the burnt area rankings highlights the increasing risk at the Wildland-Urban Interface (WUI), where human activity acts as a primary driver of landscape transformation through fire.
 
-# Chapter 4: Analysis of ignition sources and drivers
+# Chapter 5: Analysis of ignition sources and drivers
 
 ```{r}
 # 1. Preparació de dades de causes (Top 15)
@@ -608,8 +669,51 @@ The investigation into the origins of wildfires in Catalonia (1998-2022) reveals
 
 -   **The challenge of uncertainty**: The high volume of "[500] Desconocida" cases (**1,809 ignitions**) points toward the difficulty of post-fire forensic investigation. Reducing this statistical "noise" is essential for improving targeted prevention measures.
 
-# Chapter 5: The climate change and thermal extremes
+### Behavioral drivers: A detailed analysis of arsonist motivations
 
+```{r}
+# 1. Preparació de dades amb cerca parcial de text
+motivacions_data <- wfc_final2 %>%
+  # Busquem qualsevol registre que contingui la paraula "Intencionado" sense importar majúscules
+  filter(grepl("Intencionado", causa, ignore.case = TRUE)) %>% 
+  group_by(motivacion) %>%
+  summarise(
+    frequency = n(),
+    total_area = sum(superficie_total_forestal, na.rm = TRUE)
+  ) %>%
+  # Eliminem valors buits o NAs que solen embrutar el gràfic
+  filter(!is.na(motivacion) & motivacion != "" & motivacion != "Desconeguda" & motivacion != "n/a") %>%
+  slice_max(frequency, n = 10)
+
+# d'aquesta manera veuràs com es diu exactament la categoria dels intencionats.
+
+# 3. El gràfic
+ggplot(motivacions_data, aes(y = reorder(motivacion, frequency), x = frequency)) +
+  geom_col(fill = "#800026", width = 0.7) + 
+  geom_text(aes(label = frequency), hjust = -0.2, size = 3.5, fontface = "bold", color = "#800026") +
+  # Apliquem el salt de línia automàtic a l'eix Y
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 70)) +
+  expand_limits(x = max(motivacions_data$frequency) * 1.15) +
+  theme_minimal() +
+  labs(
+    title = "Analysis of arsonist motivations",
+    subtitle = "Specific drivers within intentional fires",
+    x = "Number of fires",
+    y = NULL
+  )
+```
+
+To refine the prevention strategies against intentional fires, it is essential to deconstruct the specific motivations behind the "[400] Intencionado" category. As shown in the previous plot, the breakdown of motivations provides a complex socio-behavioral map of wildfire origins in Catalonia:
+
+-   **The challenge of unknown intent**: The most frequent category is **"[400] Motivación desconocida"** with **1,270 cases**. This high volume underscores the inherent difficulty in fire investigation; while the intentionality is proven by the presence of multiple ignition points or accelerants, the specific underlying grievance or objective often remains elusive.
+
+-   **Vandalism and mental health**: A critical finding is the high incidence of **"[482] Vandalismo" (897 fires)** and **"[483] Enfermos mentales / Pirómanos" (761 fires)**. Together, these two categories represent a significant portion of the total intentional ignitions.
+
+-   **Traditional and socio-economic conflicts**: Although less frequent than vandalism, motivations linked to land use remain persistent. These include **agricultural practices ([401])**, **livestock management ([402])**, and **hunting interests ([411])**. These categories reflect a historical friction between traditional rural activities and modern forest conservation regulations, where fire is still used as a prohibited tool for landscape management.
+
+-   **Atypical drivers**: The data also captures marginal but significant behaviors, such as **"[464] Venganzas"** (Revenge) and, interestingly, **"[471] Incendios para distraer a la policía"**. These indicators highlight that wildfires are occasionally used as instruments of social conflict or as tactical diversions for other criminal activities.
+
+# Chapter 6: The climate change and thermal extremes
 
 ```{r warning=FALSE, message=FALSE}
 # 2. Afegim una columna de text personalitzada per al "tooltip" (el que es llegirà en passar el ratolí)
@@ -639,7 +743,6 @@ p_clima <- ggplot(wfc_final2, aes(x = tx, y = superficie_total_forestal, text = 
 ggplotly(p_clima, tooltip = "text")
 ```
 
-
 In the Mediterranean basin, climate change acts as a "force multiplier." It does not necessarily increase the number of ignitions---which remain largely anthropogenic---but it drastically alters the environment's receptivity to fire. This chapter analyzes how thermal thresholds dictate the transition from routine fire events to uncontrollable Large Wildfires.
 
 ## Thermal thresholds and fire severity
@@ -658,10 +761,10 @@ The variable **`thermal_amplitude`** serves as a critical proxy for relative hum
 
 -   **Fire intensity**: Fires occurring under high thermal amplitude conditions exhibit higher flame lengths and faster rates of spread, as the low overnight recovery (**TN**) prevents the fuel from regaining moisture.
 
-
-# Chapter 6: Predictive Modeling using Random Forest
+# Chapter 7: Predictive Modeling using Random Forest
 
 ## Model architecture and objective
+
 In this stage, a Random Forest regressor was implemented to quantify the predictive power of environmental and anthropogenic variables over fire severity (Burnt Area). Random Forest was selected due to its robustness against outliers and its ability to capture non-linear relationships, which are prevalent in wildfire dynamics.
 
 ```{r}
@@ -729,7 +832,6 @@ importance_df <- data.frame(
 ) %>% arrange(desc(Importance))
 
 # Plot importance
-library(ggplot2)
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   coord_flip() +
@@ -744,4 +846,34 @@ predictions <- predict(rf_model, data = test_set)$predictions
 postResample(pred = predictions, obs = test_set$log_surface)
 ```
 
+## Model setup and performance metrics
 
+To quantify the drivers of fire severity, a **Random Forest** regression model was developed using the `ranger` engine. The target variable, `superficie_total_forestal`, was transformed using a **log1p** function to normalize its highly skewed distribution and handle the high frequency of small-scale events.
+
+The model evaluation on the test set yielded the following metrics:
+
+-   **RMSE**: 0.692
+
+-   **R-squared (**$R^2$): 0.151
+
+-   **MAE**: 0.377
+
+While an $R^2$ of **15.1%** might appear low in other disciplines, in wildfire science, it reflects the inherent complexity and "noise" of fire behavior. Predicting the final size of a fire at the moment of ignition is a major challenge, as it depends on dynamic factors not fully captured in static datasets, such as suppression efficiency, wind shifts, and fuel connectivity.
+
+## Drivers of severity: variable importance analysis
+
+The primary value of the model lies in its **Permutation Importance**, which identifies which factors most significantly influence the final burnt area:
+
+-   **Geospatial predominance**: **Longitude** and **Latitude** are the top predictors. This suggests a strong spatial component in Catalonia, where specific geographic corridors are more prone to large-scale events due to persistent wind patterns or topographical funnels.
+
+-   **The "WUI" and territorial context**: The high importance of **`county_clean`** and **`afecto_zonas_interfaz_urbano_forestal`** (WUI) confirms that the territorial mosaic and proximity to human settlements are critical. Fires near urban interfaces are often more complex to manage, as resources must be split between forest suppression and structural protection.
+
+-   **Topography and climate**: **`altitude_z`** and **`tx`** (Maximum Temperature) appear as key environmental drivers. Higher temperatures lower the fuel's ignition threshold, while altitude influences both vegetation type and accessibility for ground crews.
+
+-   **Anthropogenic drivers**: The variable **`causa`** ranks significantly high, reinforcing the idea that intentionality or specific types of negligence (as seen in Chapter 3) are not just frequency issues but indicators of potentially more severe fires.
+
+## Discussion and conclusions
+
+The Random Forest results validate that fire severity in Catalonia is a multi-causal phenomenon. The model successfully identifies **location and thermal stress (TX)** as the primary "engines" of fire size.
+
+Interestingly, the low importance of **`ppt`** (Precipitation) suggests that, for the studied series, the immediate temperature and location are more decisive at the moment of ignition than recent rainfall. These insights are vital for forest management, indicating that resources should be strategically pre-positioned based on **geographic risk zones** and **thermal peaks** rather than relying solely on general seasonal trends.
