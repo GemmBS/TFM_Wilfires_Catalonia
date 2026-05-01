@@ -8,6 +8,9 @@ output:
     toc_float: true
     theme: cosmo
 ---
+```{r}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
 
 ```{r warning=FALSE, message=FALSE}
 # 1. packages import
