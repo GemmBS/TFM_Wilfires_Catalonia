@@ -342,7 +342,6 @@ bscols(
 )
 ```
 
-
 ### Where does Catalonia burn?
 
 This interactive map bridges the gap between raw data and territorial management:
@@ -355,8 +354,7 @@ This interactive map bridges the gap between raw data and territorial management
 
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
-
-```{r r warning=FALSE, message=FALSE, fig.height=14, fig.width=12}
+```{r}
 # 1. Preparació de dades (Top 10)
 top_10_muni_freq <- wfc_final2 %>%
   count(municipio) %>%
@@ -371,90 +369,90 @@ area_provincia <- wfc_final2 %>%
   group_by(provincia) %>%
   summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE))
 
-# Paleta de blaus moderns (degradats de Deep Ocean)
+# Paleta de blaus
 blue_palette <- c("#08306b", "#08519c", "#2171b5", "#4292c6")
 
-# Funció interna per estilitzar els gràfics i evitar repetir codi
-estil_tfm <- function() {
+# Funció d'estil optimitzada per a gràfics horitzontals
+estil_tfm_horizontal <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    plot.title = element_text(face = "bold", size = 13, color = "#2c3e50"),
-    axis.text.x = element_text(angle = 40, hjust = 1, size = 10),
-    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 11, color = "#2c3e50"),
+    axis.text.y = element_text(size = 9), # Noms de municipis més clars
+    axis.text.x = element_text(size = 8),
+    panel.grid.major.y = element_blank(), # Treiem graella horitzontal
     panel.grid.minor = element_blank(),
-    plot.background = element_rect(fill = "white", color = NA),
-    plot.margin = margin(10, 10, 10, 10)
+    plot.margin = margin(5, 15, 5, 5)
   )
 }
 
-# --- FREQUENCY PLOTS ---
+# --- FREQUENCY PLOTS (HORIZONTALS) ---
 
 # P1: Província Freq
-p1 <- ggplot(wfc_final2, aes(x = reorder(provincia, provincia, function(x)-length(x)))) +
+p1 <- ggplot(wfc_final2, aes(y = reorder(provincia, provincia, function(x) length(x)), x = ..count..)) +
   geom_bar(fill = blue_palette[1], width = 0.7) +
-  geom_text(stat='count', aes(label=..count..), vjust=-0.8, size=3.5, fontface="bold") +
-  expand_limits(y = count(wfc_final2, provincia) %>% pull(n) %>% max() * 1.1) +
-  labs(title = "Fire frequency by province", x = NULL, y = "Number of fires") +
-  estil_tfm()
+  geom_text(stat='count', aes(label=..count..), hjust=-0.2, size=3, fontface="bold") +
+  expand_limits(x = count(wfc_final2, provincia) %>% pull(n) %>% max() * 1.2) +
+  labs(title = "Fire frequency by province", y = NULL, x = "Number of fires") +
+  estil_tfm_horizontal()
 
 # P2: Municipi Freq
-p2 <- ggplot(top_10_muni_freq, aes(x = reorder(municipio, -n), y = n)) +
+p2 <- ggplot(top_10_muni_freq, aes(y = reorder(municipio, n), x = n)) +
   geom_col(fill = blue_palette[2], width = 0.7) +
-  geom_text(aes(label=n), vjust=-0.8, size=3.5, fontface="bold") +
-  expand_limits(y = max(top_10_muni_freq$n) * 1.1) +
-  labs(title = "Top 10 municipalities (frequency)", x = NULL, y = "Number of fires") +
-  estil_tfm()
+  geom_text(aes(label=n), hjust=-0.2, size=3, fontface="bold") +
+  expand_limits(x = max(top_10_muni_freq$n) * 1.2) +
+  labs(title = "Top 10 municipalities (frequency)", y = NULL, x = "Number of fires") +
+  estil_tfm_horizontal()
 
-# --- SEVERITY PLOTS ---
+# --- SEVERITY PLOTS (HORIZONTALS) ---
 
 # P3: Província Area
-p3 <- ggplot(area_provincia, aes(x = reorder(provincia, -total_area), y = total_area)) +
+p3 <- ggplot(area_provincia, aes(y = reorder(provincia, total_area), x = total_area)) +
   geom_col(fill = blue_palette[3], width = 0.7) +
-  geom_text(aes(label=comma(round(total_area))), vjust=-0.8, size=3.5, fontface="bold") +
-  scale_y_continuous(labels = comma) +
-  expand_limits(y = max(area_provincia$total_area) * 1.1) +
-  labs(title = "Burnt area by province", x = NULL, y = "Total area (ha)") +
-  estil_tfm()
+  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
+  scale_x_continuous(labels = comma) +
+  expand_limits(x = max(area_provincia$total_area) * 1.2) +
+  labs(title = "Burnt area by province", y = NULL, x = "Total area (ha)") +
+  estil_tfm_horizontal()
 
 # P4: Municipi Area
-p4 <- ggplot(top_10_muni_area, aes(x = reorder(municipio, -total_area), y = total_area)) +
+p4 <- ggplot(top_10_muni_area, aes(y = reorder(municipio, total_area), x = total_area)) +
   geom_col(fill = blue_palette[4], width = 0.7) +
-  geom_text(aes(label=comma(round(total_area))), vjust=-0.8, size=3.5, fontface="bold") +
-  scale_y_continuous(labels = comma) +
-  expand_limits(y = max(top_10_muni_area$total_area) * 1.1) +
-  labs(title = "Top 10 municipalities (burnt area)", x = NULL, y = "Total area (ha)") +
-  estil_tfm()
+  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
+  scale_x_continuous(labels = comma) +
+  expand_limits(x = max(top_10_muni_area$total_area) * 1.2) +
+  labs(title = "Top 10 municipalities (burnt area)", y = NULL, x = "Total area (ha)") +
+  estil_tfm_horizontal()
 
-# 5. Assemblea final amb patchwork
+# 5. Assemblea final (2 columnes, 2 files)
 final_plot <- (p1 + p2) / (p3 + p4) + 
   plot_annotation(
     title = 'Spatial impact analysis: frequency vs. severity',
     subtitle = 'Historical distribution across Catalonia (1998-2022)',
     theme = theme(
-      plot.title = element_text(size = 20, hjust = 0.5, face = "bold", color = "#1a1a1a"),
-      plot.subtitle = element_text(size = 14, hjust = 0.5, color = "grey40", margin = margin(b=20))
+      plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "grey40")
     )
   )
 
 print(final_plot)
 ```
+
 ### Key insights from the spatial analysis
 
 The comparison between frequency and severity reveals a clear decoupling of fire patterns in Catalonia:
 
-- **The "Urban-Wildland Interface" (WUI) paradox**: Barcelona leads both in frequency (5,821 fires) and total area (35,430 ha), but at the municipal level, the pattern changes. Terrassa is the municipality with the highest number of ignitions (210), likely due to its large perimeter in contact with forest areas (high human activity). However, it does not even appear in the "Top 10" of burnt area. This suggests that while ignitions are frequent near large cities, suppression is usually very fast and effective.
+-   **The "Urban-Wildland Interface" (WUI) paradox**: Barcelona leads both in frequency (5,821 fires) and total area (35,430 ha), but at the municipal level, the pattern changes. Terrassa is the municipality with the highest number of ignitions (210), likely due to its large perimeter in contact with forest areas (high human activity). However, it does not even appear in the "Top 10" of burnt area. This suggests that while ignitions are frequent near large cities, suppression is usually very fast and effective.
 
-- **High-intensity hotspots**: Contrastingly, Aguilar de Segarra leads the severity ranking with 12,515 ha burnt, despite not being a leader in frequency. This indicates that this area is prone to Large Wildfires, where a single event can cause more ecological damage than hundreds of small ignitions in the metropolitan area.
+-   **High-intensity hotspots**: Contrastingly, Aguilar de Segarra leads the severity ranking with 12,515 ha burnt, despite not being a leader in frequency. This indicates that this area is prone to Large Wildfires, where a single event can cause more ecological damage than hundreds of small ignitions in the metropolitan area.
 
-- **Strategic border areas**: La Jonquera stands out as a critical point. It ranks high in both frequency (187 fires) and burnt area (8,787 ha). 
+-   **Strategic border areas**: La Jonquera stands out as a critical point. It ranks high in both frequency (187 fires) and burnt area (8,787 ha).
 
-- **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list. 
+-   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
 
+# 4. Chapter 3: Land Cover and ecosystem vulnerability
 
-# 4. Chapter 3: Land Cover and Ecosystem Vulnerability
-
-```{r message=FALSE, fig.height=14, fig.width=12}
-# 1. Preparació de dades
+```{r}
+# 1. Preparació de dades 
 land_cover_summary <- wfc_final2 %>%
   group_by(land_cover_type) %>%
   summarise(
@@ -470,62 +468,137 @@ top_10_lc_area <- land_cover_summary %>% slice_max(total_area, n = 10)
 tree_color <- "#2d6a4f"
 trunk_color <- "#606c38"
 
-# Funció d'estil personalitzada
-estil_forestal <- function() {
+# 2. Funció d'estil per a format HORITZONTAL
+estil_forestal_horiz <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    plot.title = element_text(face = "bold", size = 13, color = "#1b4332"),
-    axis.text.x = element_text(angle = 40, hjust = 1, size = 10),
-    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 12, color = "#1b4332"),
+    axis.text.y = element_text(size = 9), 
+    axis.text.x = element_text(size = 8),
+    panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    plot.margin = margin(10, 10, 10, 10)
+    plot.margin = margin(5, 20, 5, 5) 
   )
 }
 
-# --- GRÀFICS "TREE-STYLE" (Lollipop Charts) ---
+# --- GRÀFICS HORITZONTALS ---
 
 # P5: Fire frequency by land cover type
-p5 <- ggplot(top_10_lc_freq, aes(x = reorder(land_cover_type, -frequency), y = frequency)) +
-  # El "tronc" de l'arbre
-  geom_segment(aes(xend = reorder(land_cover_type, -frequency), yend = 0), 
-               color = trunk_color, size = 1.5) +
-  # La "copa" de l'arbre (el punt de dalt)
-  geom_point(size = 8, color = tree_color) +
-  # Afegim un "emoji" o icona d'arbre si el teu sistema ho permet (opcional)
-  geom_text(label = "🌲", size = 4, color = "white", vjust = 0.5) +
-  # Número de dalt corregit amb marge
-  geom_text(aes(label = frequency), vjust = -1.5, size = 3.5, fontface = "bold", color = "#1b4332") +
-  expand_limits(y = max(top_10_lc_freq$frequency) * 1.2) +
-  labs(title = "Fire frequency by land cover type", x = NULL, y = "Number of fires") +
-  estil_forestal()
+p5 <- ggplot(top_10_lc_freq, aes(y = reorder(land_cover_type, frequency), x = frequency)) +
+  geom_segment(aes(yend = reorder(land_cover_type, frequency), xend = 0), 
+               color = trunk_color, size = 1.2) +
+  geom_point(size = 7, color = tree_color) +
+  geom_text(label = "🌲", size = 3, color = "white") +
+  geom_text(aes(label = frequency), hjust = -0.6, size = 3.5, fontface = "bold", color = "#1b4332") +
+  expand_limits(x = max(top_10_lc_freq$frequency) * 1.15) +
+  labs(title = "Fire frequency by land cover type", y = NULL, x = "Number of fires") +
+  estil_forestal_horiz()
 
 # P6: Total burnt area by land cover type
-p6 <- ggplot(top_10_lc_area, aes(x = reorder(land_cover_type, -total_area), y = total_area)) +
-  # El "tronc" de l'arbre
-  geom_segment(aes(xend = reorder(land_cover_type, -total_area), yend = 0), 
-               color = trunk_color, size = 1.5) +
-  # La "copa" de l'arbre
-  geom_point(size = 8, color = tree_color) +
-  geom_text(label = "🌳", size = 4, color = "white", vjust = 0.5) +
-  # Número de dalt amb format de milers
-  geom_text(aes(label = comma(round(total_area))), vjust = -1.5, size = 3.5, fontface = "bold", color = "#1b4332") +
-  scale_y_continuous(labels = comma) +
-  expand_limits(y = max(top_10_lc_area$total_area) * 1.2) +
-  labs(title = "Total burnt area by land cover type", x = NULL, y = "Total area (ha)") +
-  estil_forestal()
+p6 <- ggplot(top_10_lc_area, aes(y = reorder(land_cover_type, total_area), x = total_area)) +
+  geom_segment(aes(yend = reorder(land_cover_type, total_area), xend = 0), 
+               color = trunk_color, size = 1.2) +
+  geom_point(size = 7, color = tree_color) +
+  geom_text(label = "🌳", size = 3, color = "white") +
+  # Etiqueta amb format de milers
+  geom_text(aes(label = comma(round(total_area))), hjust = -0.4, size = 3.5, fontface = "bold", color = "#1b4332") +
+  scale_x_continuous(labels = comma) +
+  expand_limits(x = max(top_10_lc_area$total_area) * 1.2) +
+  labs(title = "Total burnt area by land cover type", y = NULL, x = "Total area (ha)") +
+  estil_forestal_horiz()
 
-# Unió final
+# 3. Unió final (un sota l'altre)
 land_cover_tree_plot <- p5 / p6 + 
   plot_annotation(
-    title = "Ecosystem Impact: Land Cover Analysis",
+    title = "Ecosystem Impact: Land cover analysis",
     subtitle = "Vegetation and soil types visualized as forest density (1998-2022)",
-    theme = theme(plot.title = element_text(size = 18, hjust = 0.5, face = "bold", color = "#1b4332"))
+    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold", color = "#1b4332"))
   )
 
 print(land_cover_tree_plot)
 ```
 
+The analysis of wildfire impact across different land cover types reveals a critical duality between ignition frequency and landscape severity (total burnt area):
 
+-   **Vulnerability of coniferous forests**: Dense coniferous forests exhibit the **highest fire frequency** with **3,250 recorded events**. This suggests a high susceptibility to ignition, likely due to the high flammability of resinous species.
 
+-   **The herbaceous crop paradox**: While ranking third in frequency, Herbaceous crops represent the largest total burnt area, **exceeding 25,500 hectares**. This indicates that although fires may start less frequently in agricultural zones compared to forests, they tend to propagate much faster across open fields, affecting vast extensions in shorter timeframes.
 
+-   **Shrublands as a constant threat**: Shrublands maintain a high-pressure profile in both metrics, ranking second in frequency (2,745) and second in burnt area (22,276 ha). These areas often act as "ecological bridges," allowing low-intensity fires to transition from agricultural fringes into dense forest cores.
 
+-   **Relative resilience of deciduous forests**: In contrast, dense deciduous broadleaf forests show significantly lower total burnt areas (7,661 ha). This may be attributed to higher fuel moisture retention and the lower flammability of broadleaf litter compared to needle-leaf species.
+
+-   **Urban and infrastructure pressure**: The appearance of the Road network and Urban expansion in the burnt area rankings highlights the increasing risk at the Wildland-Urban Interface (WUI), where human activity acts as a primary driver of landscape transformation through fire.
+
+# 5. Chapter 4: Analysis of ignition sources and drivers
+
+```{r}
+# 1. Preparació de dades de causes (Top 15)
+causes_data <- wfc_final2 %>%
+  group_by(causa) %>% 
+  summarise(
+    frequency = n(),
+    total_area = sum(superficie_total_forestal, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(causa) & causa != "No data")
+
+# Seleccionem les 15 primeres per cada mètrica
+top_15_causes_freq <- causes_data %>% slice_max(frequency, n = 10)
+top_15_causes_area <- causes_data %>% slice_max(total_area, n = 10)
+
+# 2. Paleta de colors "Fire" (taronges i vermells)
+cause_palette <- c("#feb24c", "#fd8d3c", "#f03b20", "#bd0026")
+
+# Funció d'estil optimitzada per a format horitzontal
+estil_causes_tfm <- function() {
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 12, color = "#800026"),
+    axis.text.y = element_text(size = 9), 
+    axis.text.x = element_text(size = 8),
+    panel.grid.major.y = element_blank(),
+    plot.margin = margin(5, 20, 5, 5)
+  )
+}
+
+# --- GRÀFICS HORITZONTALS ---
+
+# P7: Top 15 Causes by Frequency
+p7 <- ggplot(top_15_causes_freq, aes(y = reorder(causa, frequency), x = frequency)) +
+  geom_col(fill = cause_palette[2], width = 0.7) +
+  geom_text(aes(label = frequency), hjust = -0.2, size = 3, fontface = "bold") +
+  expand_limits(x = max(top_15_causes_freq$frequency) * 1.2) +
+  labs(title = "Top 15 fire causes by frequency", y = NULL, x = "Number of fires") +
+  estil_causes_tfm()
+
+# P8: Top 15 Causes by Burnt Area
+p8 <- ggplot(top_15_causes_area, aes(y = reorder(causa, total_area), x = total_area)) +
+  geom_col(fill = cause_palette[4], width = 0.7) +
+  geom_text(aes(label = scales::comma(round(total_area))), hjust = -0.2, size = 3, fontface = "bold") +
+  scale_x_continuous(labels = scales::comma) +
+  expand_limits(x = max(top_15_causes_area$total_area) * 1.25) +
+  labs(title = "Top 15 fire causes by burnt area", y = NULL, x = "Total area (ha)") +
+  estil_causes_tfm()
+
+# 3. Assemblea final (un sota l'altre)
+causes_plot_final <- p7 / p8 + 
+  plot_annotation(
+    title = "Analysis of ignition sources",
+    subtitle = "Top 15 most frequent and impactful causes (1998-2022)",
+    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold", color = "#800026"))
+  )
+
+print(causes_plot_final)
+```
+
+The investigation into the origins of wildfires in Catalonia (1998-2022) reveals a landscape dominated by human activity, where the intent and negligence of individuals outweigh natural causes in both frequency and severity.
+
+-   **The critical impact of arson**: The category "[400] Intencionado" is the primary driver of the fire problem in Catalonia. It not only records the highest frequency with **3,548 ignitions** but also results in the largest ecological footprint, accounting for **30,435 hectares burnt**.
+
+-   **Negligence and infrastructure**: While intentional fires lead in severity, a significant portion of the total area is lost due to technical and human failures. "[320] Otras causas por líneas eléctricas" represents a major risk factor: although it is not in the top three for frequency, it ranks second in burnt area (**18,736 ha**). This suggests that utility-related fires often occur in remote or forested areas where detection is slower and suppression more complex.
+
+-   **Smoking and public awareness**: The category "[250] Fumadores" remains a persistent threat, appearing prominently in both charts. With over **800 fires** and **14,255 hectares** destroyed, it underscores the ongoing need for public awareness campaigns regarding the disposal of cigarette butts, especially near road networks and forest interfaces.
+
+-   **Natural vs. anthropogenic origins**: Lightning ("[100] Rayo") is the most frequent natural cause (**1,477 fires**). However, its impact on the total burnt area (**5,029 ha**) is considerably lower than that of intentional or negligent human acts. This confirms that wildfires in Catalonia are, fundamentally, a human-driven phenomenon.
+
+-   **The challenge of uncertainty**: The high volume of "[500] Desconocida" cases (**1,809 ignitions**) points toward the difficulty of post-fire forensic investigation. Reducing this statistical "noise" is essential for improving targeted prevention measures.
