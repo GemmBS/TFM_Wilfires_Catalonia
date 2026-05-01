@@ -141,6 +141,9 @@ To understand the current risk, we must look at the historical series (1998-2022
 
 - **A slow descent**: We observe a slight decrease in ignitions over time, reflecting more efficient detection and prevention measures.
 
+
+# 3. Chapter 2: The core of the story (interactive exploration)
+
 ```{r}
 # MAP
 # 1. Data Preparation
@@ -194,3 +197,15 @@ bscols(
     )
 )
 ```
+
+### Where does Catalonia burn?
+
+This interactive map bridges the gap between raw data and territorial management:
+
+- **Regional pressure**: You can visually confirm the high density of events in the Barcelona Metropolitan Area and the Empordà.
+
+- **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
+
+- **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
+
+
