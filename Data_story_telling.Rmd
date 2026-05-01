@@ -33,6 +33,11 @@ library(crosstalk)
 library(shiny)
 library(shinydashboard)  
 library(plotly)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(caret)
+library(ranger)
 
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
@@ -652,3 +657,91 @@ The variable **`thermal_amplitude`** serves as a critical proxy for relative hum
 -   **Atmospheric dryness**: High amplitude values (where $TX - TN > 20°C$) are strongly correlated with the most impactful wildfires in the 25-year series.
 
 -   **Fire intensity**: Fires occurring under high thermal amplitude conditions exhibit higher flame lengths and faster rates of spread, as the low overnight recovery (**TN**) prevents the fuel from regaining moisture.
+
+
+# Chapter 6: Predictive Modeling using Random Forest
+
+## Model architecture and objective
+In this stage, a Random Forest regressor was implemented to quantify the predictive power of environmental and anthropogenic variables over fire severity (Burnt Area). Random Forest was selected due to its robustness against outliers and its ability to capture non-linear relationships, which are prevalent in wildfire dynamics.
+
+```{r}
+# 1. Feature Selection and Formatting
+# FINAL MODEL DATASET SELECTION
+wfc_model_final <- wfc_final2 %>%
+  select(
+    # Target (Change this based on your goal)
+    superficie_total_forestal, 
+    
+    # Location
+    county_clean, altitude_z, latitude, longitude,
+    
+    # Meteorology
+    tx, ppt, thermal_amplitude,
+    
+    # Time
+    month_detected, hour_detected,year,
+    
+    # Land Cover & Risk
+    land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
+    afecto_espacio_protegido, afecto_zar,
+    
+    # Context
+    causa
+  ) %>%
+  # Convert to factors for Random Forest
+  mutate(across(where(is.character), as.factor),
+         land_cover_id = as.factor(land_cover_id),
+         month_detected = as.factor(month_detected),
+         # If hour_detected is numeric, we might keep it as is or factorize it
+         hour_detected = as.numeric(hour_detected)) %>%
+  drop_na()
+
+# Apply Log1p transformation (log(x + 1)) to handle 0 values
+wfc_model_final <- wfc_model_final %>%
+  mutate(log_surface = log1p(superficie_total_forestal))
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Create the partition based on the target variable
+train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
+
+# Generate sets
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+
+
+# Train the Random Forest model
+# We predict 'log_surface' using all other columns in 'train_set'
+rf_model <- ranger(
+  formula         = log_surface ~ ., 
+  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  num.trees       = 500,
+  importance      = "permutation", # Important to analyze variable impact later
+  seed            = 123
+)
+
+# Get importance
+importance_values <- importance(rf_model)
+importance_df <- data.frame(
+  Variable = names(importance_values),
+  Importance = importance_values
+) %>% arrange(desc(Importance))
+
+# Plot importance
+library(ggplot2)
+ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Variable Importance in Wildfire Surface Prediction",
+       x = "Predictors", y = "Importance (Permutation)")
+
+# Predict on test set
+predictions <- predict(rf_model, data = test_set)$predictions
+
+# Calculate Performance Metrics (RMSE and R2)
+postResample(pred = predictions, obs = test_set$log_surface)
+```
+
+
