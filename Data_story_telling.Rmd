@@ -32,6 +32,7 @@ library(dplyr)
 library(crosstalk)
 library(shiny)
 library(shinydashboard)  
+library(plotly)
 
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
@@ -342,3 +343,180 @@ This interactive map bridges the gap between raw data and territorial management
 -   **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
 
 -   **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
+
+In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
+
+
+```{r}
+# 1. Preparació de dades (Top 10)
+top_10_muni_freq <- wfc_final2 %>%
+  count(municipio) %>%
+  slice_max(n, n = 10)
+
+top_10_muni_area <- wfc_final2 %>%
+  group_by(municipio) %>%
+  summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE)) %>%
+  slice_max(total_area, n = 10)
+
+area_provincia <- wfc_final2 %>%
+  group_by(provincia) %>%
+  summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE))
+
+# Paleta de blaus moderns (degradats de Deep Ocean)
+blue_palette <- c("#08306b", "#08519c", "#2171b5", "#4292c6")
+
+# Funció interna per estilitzar els gràfics i evitar repetir codi
+estil_tfm <- function() {
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, color = "#2c3e50"),
+    axis.text.x = element_text(angle = 40, hjust = 1, size = 10),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+}
+
+# --- FREQUENCY PLOTS ---
+
+# P1: Província Freq
+p1 <- ggplot(wfc_final2, aes(x = reorder(provincia, provincia, function(x)-length(x)))) +
+  geom_bar(fill = blue_palette[1], width = 0.7) +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.8, size=3.5, fontface="bold") +
+  expand_limits(y = count(wfc_final2, provincia) %>% pull(n) %>% max() * 1.1) +
+  labs(title = "Fire frequency by province", x = NULL, y = "Number of fires") +
+  estil_tfm()
+
+# P2: Municipi Freq
+p2 <- ggplot(top_10_muni_freq, aes(x = reorder(municipio, -n), y = n)) +
+  geom_col(fill = blue_palette[2], width = 0.7) +
+  geom_text(aes(label=n), vjust=-0.8, size=3.5, fontface="bold") +
+  expand_limits(y = max(top_10_muni_freq$n) * 1.1) +
+  labs(title = "Top 10 municipalities (frequency)", x = NULL, y = "Number of fires") +
+  estil_tfm()
+
+# --- SEVERITY PLOTS ---
+
+# P3: Província Area
+p3 <- ggplot(area_provincia, aes(x = reorder(provincia, -total_area), y = total_area)) +
+  geom_col(fill = blue_palette[3], width = 0.7) +
+  geom_text(aes(label=comma(round(total_area))), vjust=-0.8, size=3.5, fontface="bold") +
+  scale_y_continuous(labels = comma) +
+  expand_limits(y = max(area_provincia$total_area) * 1.1) +
+  labs(title = "Burnt area by province", x = NULL, y = "Total area (ha)") +
+  estil_tfm()
+
+# P4: Municipi Area
+p4 <- ggplot(top_10_muni_area, aes(x = reorder(municipio, -total_area), y = total_area)) +
+  geom_col(fill = blue_palette[4], width = 0.7) +
+  geom_text(aes(label=comma(round(total_area))), vjust=-0.8, size=3.5, fontface="bold") +
+  scale_y_continuous(labels = comma) +
+  expand_limits(y = max(top_10_muni_area$total_area) * 1.1) +
+  labs(title = "Top 10 municipalities (burnt area)", x = NULL, y = "Total area (ha)") +
+  estil_tfm()
+
+# 5. Assemblea final amb patchwork
+final_plot <- (p1 + p2) / (p3 + p4) + 
+  plot_annotation(
+    title = 'Spatial impact analysis: frequency vs. severity',
+    subtitle = 'Historical distribution across Catalonia (1998-2022)',
+    theme = theme(
+      plot.title = element_text(size = 20, hjust = 0.5, face = "bold", color = "#1a1a1a"),
+      plot.subtitle = element_text(size = 14, hjust = 0.5, color = "grey40", margin = margin(b=20))
+    )
+  )
+
+print(final_plot)
+```
+### Key insights from the spatial analysis
+
+The comparison between frequency and severity reveals a clear decoupling of fire patterns in Catalonia:
+
+- **The "Urban-Wildland Interface" (WUI) paradox**: Barcelona leads both in frequency (5,821 fires) and total area (35,430 ha), but at the municipal level, the pattern changes. Terrassa is the municipality with the highest number of ignitions (210), likely due to its large perimeter in contact with forest areas (high human activity). However, it does not even appear in the "Top 10" of burnt area. This suggests that while ignitions are frequent near large cities, suppression is usually very fast and effective.
+
+- **High-intensity hotspots**: Contrastingly, Aguilar de Segarra leads the severity ranking with 12,515 ha burnt, despite not being a leader in frequency. This indicates that this area is prone to Large Wildfires, where a single event can cause more ecological damage than hundreds of small ignitions in the metropolitan area.
+
+- **Strategic border areas**: La Jonquera stands out as a critical point. It ranks high in both frequency (187 fires) and burnt area (8,787 ha). 
+
+- **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list. 
+
+
+# 4. Chapter 3: Land Cover and Ecosystem Vulnerability
+
+```{r}
+# 1. Preparació de dades
+land_cover_summary <- wfc_final2 %>%
+  group_by(land_cover_desc) %>%
+  summarise(
+    frequency = n(),
+    total_area = sum(superficie_total_forestal, na.rm = TRUE)
+  ) %>%
+  filter(land_cover_desc != "No data")
+
+top_10_lc_freq <- land_cover_summary %>% slice_max(frequency, n = 10)
+top_10_lc_area <- land_cover_summary %>% slice_max(total_area, n = 10)
+
+# Paleta de colors verds
+tree_color <- "#2d6a4f"
+trunk_color <- "#606c38"
+
+# Funció d'estil personalitzada
+estil_forestal <- function() {
+  theme_minimal(base_family = "sans") +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, color = "#1b4332"),
+    axis.text.x = element_text(angle = 40, hjust = 1, size = 10),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+}
+
+# --- GRÀFICS "TREE-STYLE" (Lollipop Charts) ---
+
+# P5: Fire frequency by land cover type
+p5 <- ggplot(top_10_lc_freq, aes(x = reorder(land_cover_desc, -frequency), y = frequency)) +
+  # El "tronc" de l'arbre
+  geom_segment(aes(xend = reorder(land_cover_desc, -frequency), yend = 0), 
+               color = trunk_color, size = 1.5) +
+  # La "copa" de l'arbre (el punt de dalt)
+  geom_point(size = 8, color = tree_color) +
+  # Afegim un "emoji" o icona d'arbre si el teu sistema ho permet (opcional)
+  geom_text(label = "🌲", size = 4, color = "white", vjust = 0.5) +
+  # Número de dalt corregit amb marge
+  geom_text(aes(label = frequency), vjust = -1.5, size = 3.5, fontface = "bold", color = "#1b4332") +
+  expand_limits(y = max(top_10_lc_freq$frequency) * 1.2) +
+  labs(title = "Fire frequency by land cover type", x = NULL, y = "Number of fires") +
+  estil_forestal()
+
+# P6: Total burnt area by land cover type
+p6 <- ggplot(top_10_lc_area, aes(x = reorder(land_cover_desc, -total_area), y = total_area)) +
+  # El "tronc" de l'arbre
+  geom_segment(aes(xend = reorder(land_cover_desc, -total_area), yend = 0), 
+               color = trunk_color, size = 1.5) +
+  # La "copa" de l'arbre
+  geom_point(size = 8, color = tree_color) +
+  geom_text(label = "🌳", size = 4, color = "white", vjust = 0.5) +
+  # Número de dalt amb format de milers
+  geom_text(aes(label = comma(round(total_area))), vjust = -1.5, size = 3.5, fontface = "bold", color = "#1b4332") +
+  scale_y_continuous(labels = comma) +
+  expand_limits(y = max(top_10_lc_area$total_area) * 1.2) +
+  labs(title = "Total burnt area by land cover type", x = NULL, y = "Total area (ha)") +
+  estil_forestal()
+
+# Unió final
+land_cover_tree_plot <- p5 / p6 + 
+  plot_annotation(
+    title = "Ecosystem Impact: Land Cover Analysis",
+    subtitle = "Vegetation and soil types visualized as forest density (1998-2022)",
+    theme = theme(plot.title = element_text(size = 18, hjust = 0.5, face = "bold", color = "#1b4332"))
+  )
+
+print(land_cover_tree_plot)
+```
+
+
+
+
+
