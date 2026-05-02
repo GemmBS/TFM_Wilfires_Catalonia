@@ -1061,3 +1061,264 @@ plots_cat <- lapply(categorical_vars, function(var) {
 
 walk(plots_cat, print)
 
+
+library(tidyverse)
+library(nanoparquet)
+library(here)
+library(scales)
+library(naniar) 
+library(skimr) 
+library(patchwork)
+library(VIM)
+library(gt)
+library(purrr)
+library(forcats)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(gridExtra)
+library(leaflet)
+library(dplyr)
+library(crosstalk)
+library(shiny)
+library(shinydashboard)  
+library(plotly)
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(caret)
+library(ranger)
+library(pROC)
+
+
+
+# 1. Data Import
+
+
+# Final dataset import
+wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
+
+
+# 2. Quantitative Analysis of Fire Severity: A Random Forest Regression Approach to Burnt Area Prediction.
+## 2.1 Pre-processing and Feature Engineering
+### 2.1.1 Data Cleaning and Feature Selection
+In this step, we filter the columns, handle categorical variables as factors, and prepare the dataset for the model.
+
+
+# Load required libraries
+library(dplyr)
+library(tidyr)
+library(corrplot)
+library(caret)
+
+# 1. Feature Selection and Formatting
+# FINAL MODEL DATASET SELECTION
+wfc_model_final <- wfc_final2 %>%
+  select(
+    # Target (Change this based on your goal)
+    superficie_total_forestal, 
+    
+    # Location
+    altitude_z, latitude, longitude,
+    
+    # Meteorology
+    tx, ppt, thermal_amplitude,
+    
+    # Time
+    month_detected, hour_detected,
+    
+    # Land Cover & Risk
+    land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
+    afecto_espacio_protegido, afecto_zar,
+    
+    # Context
+    causa
+  ) %>%
+  # Convert to factors for Random Forest
+  mutate(across(where(is.character), as.factor),
+         land_cover_id = as.factor(land_cover_id),
+         month_detected = as.factor(month_detected),
+         # If hour_detected is numeric, we might keep it as is or factorize it
+         hour_detected = as.numeric(hour_detected)) %>%
+  drop_na()
+
+
+
+### 2.1.2 Correlation Analysis
+
+We use Spearman correlation because your previous histograms showed that the numerical variables are not normally distributed.
+
+
+# Select only numerical columns for the matrix
+numeric_vars <- wfc_model_final %>% select(where(is.numeric))
+cor_matrix <- cor(numeric_vars, method = "spearman")
+
+# Plotting the correlation matrix
+corrplot(cor_matrix, 
+         method = "color", 
+         type = "upper", 
+         addCoef.col = "black", 
+         tl.col = "black", 
+         diag = FALSE,
+         title = "\nSpearman Correlation Matrix of Predictors",
+         mar = c(0,0,2,0))
+cor_matrix
+
+
+
+### 2.1.3 Target Variable Transformation
+
+Since the burnt surface is highly skewed (most fires are small, few are huge), we apply a Logarithmic transformation to stabilize the variance.
+
+
+# Apply Log1p transformation (log(x + 1)) to handle 0 values
+wfc_model_final <- wfc_model_final %>%
+  mutate(log_surface = log1p(superficie_total_forestal))
+
+# Visualize the effect of the transformation
+par(mfrow=c(1,2))
+hist(wfc_model_final$superficie_total_forestal, main="Original Surface", col="salmon")
+hist(wfc_model_final$log_surface, main="Log-transformed Surface", col="lightblue")
+par(mfrow=c(1,1))
+
+
+
+### 2.1.4 Data Splitting (Training and Testing)
+
+We split the data into an 80% Training set and a 20% Test set.
+
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Create the partition based on the target variable
+train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
+
+# Generate sets
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+
+# Print final dimensions
+message("Training set rows: ", nrow(train_set))
+message("Testing set rows: ", nrow(test_set))
+
+
+
+## 2.3 Random Forest Model: Regression Approach to Burnt Area Prediction
+
+
+# Install and load ranger if you haven't
+library(ranger)
+
+# Train the Random Forest model
+# We predict 'log_surface' using all other columns in 'train_set'
+rf_model <- ranger(
+  formula         = log_surface ~ ., 
+  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  num.trees       = 500,
+  importance      = "permutation", # Important to analyze variable impact later
+  seed            = 123
+)
+
+# Print model summary
+print(rf_model)
+
+
+
+# Get importance
+importance_values <- importance(rf_model)
+importance_df <- data.frame(
+  Variable = names(importance_values),
+  Importance = importance_values
+) %>% arrange(desc(Importance))
+
+# Plot importance
+library(ggplot2)
+ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Variable Importance in Wildfire Surface Prediction",
+       x = "Predictors", y = "Importance (Permutation)")
+
+
+
+
+# Predict on test set
+predictions <- predict(rf_model, data = test_set)$predictions
+
+# Calculate Performance Metrics (RMSE and R2)
+postResample(pred = predictions, obs = test_set$log_surface)
+```
+
+
+# 3. Predictive Modeling of Fire Susceptibility: A Binary Classification Framework via Ensemble Learning.
+## 3.1 Pre-processing and Feature Engineering
+### 3.1.4 Data Splitting (Training and Testing)
+
+- **Threshold definition for severity classification**
+  
+  Before proceeding with the classification modeling, it is essential to define a threshold that allows us to categorize the fires into two classes: High Severity and Low Severity. Instead of choosing an arbitrary value, we conduct an exploratory analysis of the distribution of the burnt forest area to ensure the statistical robustness of the model.
+
+
+summary(wfc_model_final$superficie_total_forestal)
+
+The analysis of the variable total_forest_area reveals a distribution with an extremely high positive skew (right-skewed). While the median is only 0.07 ha, the mean rises to 6.67 ha due to the influence of a few large-scale fires (up to a maximum of 9,301 ha).
+
+This disparity indicates that 75% of the fires (3rd quartile = 0.37 ha) are, in fact, small outbreaks. Therefore, using the arithmetic mean as a cutoff point allows us to identify those events that deviate significantly from the central behavior and represent the real danger for forest management.
+
+
+table(wfc_final2$superficie_total_forestal > 6.67)
+```
+The resulting distribution provides a total of 525 cases for the high severity class and 13,872 for the low severity class. This selection allows the model to focus on the 3.6% of the fires with the greatest impact, while also ensuring a sufficiently representative sample of the minority class for the Random Forest algorithm to effectively learn the predictive patterns.
+
+
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+
+set.seed(123)
+train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+
+
+
+
+# 1. Afegim 'sampling = "down"' al trainControl
+fitControl <- trainControl(
+  method = "cv",
+  number = 10,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = "final",
+  sampling = "down" 
+)
+
+rf_final_model <- train(
+  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data = train_set,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "ROC", 
+  importance = "permutation"
+)
+
+
+
+
+final_preds <- predict(rf_final_model, newdata = test_set)
+final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+
+
+conf_matrix <- confusionMatrix(final_preds, test_set$severity)
+print(conf_matrix)
+
+roc_obj <- roc(test_set$severity, final_probs$High)
+auc_value <- auc(roc_obj)
+print(paste("AUC final del model:", auc_value))
+
+
+
+importancia_data <- varImp(rf_final_model, scale = FALSE)
+
+
+plot(importancia_data, top = 15, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
