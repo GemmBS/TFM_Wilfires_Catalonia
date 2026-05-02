@@ -70,13 +70,13 @@ wfc_model_final <- wfc_final2 %>%
     superficie_total_forestal, 
     
     # Location
-    county_clean, altitude_z, latitude, longitude,
+    altitude_z, latitude, longitude,
     
     # Meteorology
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,year,
+    month_detected, hour_detected,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -207,9 +207,27 @@ postResample(pred = predictions, obs = test_set$log_surface)
 ## 3.1 Pre-processing and Feature Engineering
 ### 3.1.4 Data Splitting (Training and Testing)
 
+- **Threshold definition for severity classification**
+
+Before proceeding with the classification modeling, it is essential to define a threshold that allows us to categorize the fires into two classes: High Severity and Low Severity. Instead of choosing an arbitrary value, we conduct an exploratory analysis of the distribution of the burnt forest area to ensure the statistical robustness of the model.
+
 ```{r}
-# Creem la classe binària (Severity) seguint Mitsopoulos et al. (2019)
-wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 10, "High", "Low"))
+summary(wfc_model_final$superficie_total_forestal)
+```
+The analysis of the variable total_forest_area reveals a distribution with an extremely high positive skew (right-skewed). While the median is only 0.07 ha, the mean rises to 6.67 ha due to the influence of a few large-scale fires (up to a maximum of 9,301 ha).
+
+This disparity indicates that 75% of the fires (3rd quartile = 0.37 ha) are, in fact, small outbreaks. Therefore, using the arithmetic mean as a cutoff point allows us to identify those events that deviate significantly from the central behavior and represent the real danger for forest management.
+
+```{r}
+# Comprovar quants incendis superen la mitjana
+table(wfc_final2$superficie_total_forestal > 6.67)
+```
+The resulting distribution provides a total of 525 cases for the high severity class and 13,872 for the low severity class. This selection allows the model to focus on the 3.6% of the fires with the greatest impact, while also ensuring a sufficiently representative sample of the minority class for the Random Forest algorithm to effectively learn the predictive patterns.
+
+
+```{r}
+# Creem la classe binària (Severity)
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
 
 # 1. Separació inicial (Hold-out)
 set.seed(123)
@@ -231,7 +249,7 @@ fitControl <- trainControl(
 )
 
 rf_final_model <- train(
-  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + county_clean + latitude + longitude + month_detected + hour_detected + year + afecto_zonas_interfaz_urbano_forestal,
+  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
   data = train_set,
   method = "ranger",
   trControl = fitControl,
@@ -261,6 +279,6 @@ importancia_data <- varImp(rf_final_model, scale = FALSE)
 
 # 2. Seleccionar només les, per exemple, 10 més importants
 # Això farà que el gràfic sigui molt més net i entenedor
-plot(importancia_data, top = 10, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
+plot(importancia_data, top = 15, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
 ```
 
