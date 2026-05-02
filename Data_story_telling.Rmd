@@ -7,7 +7,26 @@ output:
     toc: true
     toc_float: true
     theme: cosmo
+references:
+- id: martinez2003
+  type: article-journal
+  author:
+  - family: Martínez Navarro
+    given: Ferran
+  - family: Simón-Soria
+    given: Fernando
+  - family: López-Abente
+    given: Gonzalo
+  issued:
+    year: 2004
+  title: "Valoración del impacto de la ola de calor del verano de 2003 sobre la mortalidad"
+  container-title: "Gaceta Sanitaria"
+  volume: 18
+  issue: "Supl. 1"
+  page: 250-258
+  URL: "http://scielo.isciii.es/scielo.php?script=sci_arttext&pid=S0213-91112004000400040"
 ---
+
 ```{r}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
@@ -57,6 +76,8 @@ Wildfires are one of the most significant environmental threats in Catalonia. As
 
 -   **Identify spatio-temporal patterns**: To understand not just when it burns, but where the recurrence is highest.
 
+-   **Analyze meteorological drivers**: To evaluate how variables such as maximum temperature, thermal amplitude, and precipitation define the windows of opportunity for fire escalation.
+
 -   **Correlate causes and landscape**: To see how human activity and land cover types interact to create risk.
 
 -   **Bridge descriptive and predictive analysis**: To provide a visual foundation that justifies the variables used in our Random Forest predictive model.
@@ -71,8 +92,8 @@ total_area <- sum(wfc_final2$superficie_total_forestal, na.rm = TRUE)
 
 # Custom display using valueBoxes
 fluidRow(
-  valueBox(total_fires, subtitle = "Total Fires Recorded", icon = icon("fire"), color = "red"),
-  valueBox(round(total_area / 1000, 1), subtitle = "Total Thousand Ha Burnt", icon = icon("tree"), color = "yellow")
+  valueBox(total_fires, subtitle = "Total Fires Recorded", icon = icon("fire", style = "color: #FF4500;"), color = "red"),
+  valueBox(round(total_area / 1000, 1), subtitle = "Total Thousand Ha Burnt", icon = icon("tree", style = "color: #2E8B57;"), color = "yellow")
 )
 ```
 
@@ -108,9 +129,9 @@ p_year <- ggplot(yearly_counts, aes(x = year, y = n)) +
   scale_x_continuous(breaks = seq(min(yearly_counts$year), max(yearly_counts$year), by = 1)) +
   theme_minimal() +
   labs(title = "Annual fire frequency evolution", 
-       subtitle = "1998 - 2022 Historical Series with Linear Trend",
+       subtitle = "1998 - 2022 Historical series with linear trend",
        x = "Year", 
-       y = "Number of Fires") +
+       y = "Number of fires") +
   theme(
     plot.title = element_text(size = 12, face = "bold"),
     axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1) # Vertical labels
@@ -141,13 +162,13 @@ final_temporal_plot <- p_year + p_month +
 print(final_temporal_plot)
 ```
 
-To understand the current risk, we must look at the historical series (1998-2022). As shown in the Annual Wildfire Summary table and the temporal plots:
+To understand the current risk, we must look at the historical series (1998-2022). As shown in the annual wildfire summary table and the temporal plots:
 
--   **Interannual variability**: Wildfires in Catalonia are episodic. The table highlights that years like 1998 and 2012 are not just frequency peaks but true ecological disasters, with 20,992 ha and 15,026 ha burnt respectively. These represent critical thresholds of drought and heat.
+-   **Interannual variability**: Wildfires in Catalonia are episodic. The table highlights that years like 1998 and 2012 are not just frequency peaks but true ecological disasters, with 20,992 ha and 15,026 ha burnt respectively.
 
--   **Frequency vs. severity:** By comparing the line chart with the table, we notice an interesting pattern: a high number of fires (like in 2005 with 894 ignitions) doesn't always correlate with the largest burnt area (5,495 ha), suggesting that fire suppression efficiency varies depending on meteorological synoptics.
+-   **Frequency vs. severity:** By comparing the line chart with the table, we notice an interesting pattern: a high number of fires (like in 2005 with 894 ignitions) doesn't always correlate with the largest burnt area (5,495 ha). This discrepancy highlights that fire spread depends on a complex interaction of factors beyond mere ignition count.
 
--   **The seasonal double peak**: While the bar chart shows summer is the main threat, the secondary peak in March highlights the danger of agricultural winter fires, a factor to be further analyzed in the "Causes" section.
+-   **The seasonal double peak**: While the bar chart shows summer is the main threat, the secondary peak in March highlights the danger of winter fires.
 
 -   **A slow descent**: The blue trend line in the plot, supported by the lower figures in the last decade of the table (e.g., 2018 or 2020), reflects a slight decrease in ignitions over time. This trend suggests that prevention measures are mitigating the increasing climatic risk.
 
@@ -290,65 +311,86 @@ wfc_final2 <- wfc_final2 %>%
   left_join(land_cover_lookup, by = "land_cover_id")
 ```
 
-```{r}
-# MAP
+
+```{r warning=FALSE, message=FALSE}
+# INTERACTIVE MAP: SPATIAL IMPACT AND MAXIMUM TEMPERATURE (TX)
+
 # 1. Data Preparation for Leaflet
 wfc_map_data <- wfc_final2 %>%
   mutate(
-    # Year MUST be numeric for the slider to work correctly
+    # Year must be numeric for the slider to function correctly
     year_num = as.numeric(as.character(year)),
     
-    # Create the customized popup text in English
+    # Create the customized popup text including meteorological and fire data
     popup_text = paste0(
       "<div style='font-family: Arial; font-size: 12px;'>",
       "<b style='color: #8B0000;'>Municipality:</b> ", municipio, "<br>",
       "<strong>Year:</strong> ", year, "<br>",
       "<strong>Detected:</strong> ", date_detected, "<br>",
       "<strong>Extinguished:</strong> ", date_extinguished, "<br>",
+      "<strong>Max Temp (TX):</strong> ", tx, "°C<br>",
       "<strong>Burnt Surface:</strong> ", superficie_total_forestal, " ha<br>",
       "<strong>Land Cover Type:</strong> ", land_cover_type, "<br>",
       "<strong>Cause:</strong> ", causa, 
       "</div>"
     )
   ) %>%
-  # Seleccionem les variables necessàries i traiem el land_cover_id
+  # Select all necessary columns for the map and synchronization
   select(longitude, latitude, year_num, popup_text, superficie_total_forestal, 
-         municipio, date_detected, date_extinguished, land_cover_type)
+         municipio, date_detected, date_extinguished, land_cover_type, tx)
 
-# 2. Create SharedData object
+# 2. Create SharedData object for crosstalk interactivity
 sd <- SharedData$new(wfc_map_data)
 
-# 3. Interactive Layout with Slider
+# 3. Define color palette based on Maximum Temperature (TX)
+# Using "YlOrRd" (Yellow-Orange-Red) to represent heat intensity
+pal <- colorNumeric(
+  palette = "YlOrRd",
+  domain = wfc_map_data$tx
+)
+
+# 4. Interactive Layout with Slider and Map
 bscols(
   widths = c(12),
-  # Year Slider
+  # Year range filter slider
   filter_slider(
     id = "year_slider", 
     label = "Slide to navigate through years (1998-2022):", 
     sharedData = sd, 
     column = ~year_num,
-    step = 1,          # Move year by year
-    ticks = TRUE,      # Show year marks
-    sep = "",          # Avoid commas in years (e.g., 2,022 -> 2022)
+    step = 1,
+    ticks = TRUE,
+    sep = "", 
     width = "100%"
   ),
-  # Leaflet Map
+  # Leaflet map configuration
   leaflet(sd, width = "100%", height = 700) %>%
     addTiles() %>% 
-    addProviderTiles(providers$CartoDB.Positron) %>%
+    addProviderTiles(providers$OpenStreetMap) %>% 
     addCircleMarkers(
       lng = ~longitude, 
       lat = ~latitude,
+      # Radius is scaled by the square root of the burnt area for better visualization
       radius = ~sqrt(superficie_total_forestal) + 3, 
-      color = "#E44D2E",
+      color = ~pal(tx), # Circle color reflects the max temperature of the fire day
       stroke = TRUE,
       weight = 1,
-      fillOpacity = 0.7,
+      fillOpacity = 0.8,
       popup = ~popup_text,
-      label = ~paste(municipio, "-", superficie_total_forestal, "ha")
+      label = ~paste0(municipio, " - ", superficie_total_forestal, " ha (", tx, "°C)")
+    ) %>%
+    # Add legend to interpret temperature colors
+    addLegend(
+      pal = pal, 
+      values = wfc_map_data$tx, 
+      title = "Max Temp (°C)", 
+      position = "bottomright",
+      labFormat = labelFormat(suffix = "°C")
     )
 )
 ```
+
+
 
 ### Where does Catalonia burn?
 
@@ -358,11 +400,15 @@ This interactive map bridges the gap between raw data and territorial management
 
 -   **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
 
+- **Thermal intensity**: The color of the markers represents the maximum temperature ($TX$) recorded on the day of the ignition. A shift towards darker red tones indicates more extreme thermal conditions.
+
+- **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
+
 -   **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
 
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 # 1. Preparació de dades (Top 10)
 top_10_muni_freq <- wfc_final2 %>%
   count(municipio) %>%
@@ -380,67 +426,67 @@ area_provincia <- wfc_final2 %>%
 # Paleta de blaus
 blue_palette <- c("#08306b", "#08519c", "#2171b5", "#4292c6")
 
-# Funció d'estil optimitzada per a gràfics horitzontals
+# --- FUNCIÓ D'ESTIL AMB MARGES EXTREMS ---
 estil_tfm_horizontal <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    plot.title = element_text(face = "bold", size = 11, color = "#2c3e50"),
-    axis.text.y = element_text(size = 9), # Noms de municipis més clars
-    axis.text.x = element_text(size = 8),
-    panel.grid.major.y = element_blank(), # Treiem graella horitzontal
+    # Títols una mica més petits per evitar que xoquin entre gràfics
+    plot.title = element_text(face = "bold", size = 10, color = "#2c3e50", margin = margin(b = 10)),
+    axis.text.y = element_text(size = 8.5), 
+    axis.text.x = element_text(size = 7.5),
+    panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    plot.margin = margin(5, 15, 5, 5)
+    # Marge dret molt gran (40) per encabir els números del geom_text
+    plot.margin = margin(10, 40, 10, 5) 
   )
 }
 
-# --- FREQUENCY PLOTS (HORIZONTALS) ---
+# --- APLICACIÓ ALS GRÀFICS AMB EXPANSIÓ DEL 45% ---
 
-# P1: Província Freq
+# P1 i P2 (Freqüència)
 p1 <- ggplot(wfc_final2, aes(y = reorder(provincia, provincia, function(x) length(x)), x = ..count..)) +
   geom_bar(fill = blue_palette[1], width = 0.7) +
   geom_text(stat='count', aes(label=..count..), hjust=-0.2, size=3, fontface="bold") +
-  expand_limits(x = count(wfc_final2, provincia) %>% pull(n) %>% max() * 1.2) +
+  # El mult = c(0, 0.45) reserva gairebé la meitat del gràfic per al text a la dreta
+  scale_x_continuous(expand = expansion(mult = c(0, 0.45))) +
   labs(title = "Fire frequency by province", y = NULL, x = "Number of fires") +
   estil_tfm_horizontal()
 
-# P2: Municipi Freq
 p2 <- ggplot(top_10_muni_freq, aes(y = reorder(municipio, n), x = n)) +
-  geom_col(fill = blue_palette[2], width = 0.7) +
+  geom_col(fill = blue_palette[2], width = 0.8) +
   geom_text(aes(label=n), hjust=-0.2, size=3, fontface="bold") +
-  expand_limits(x = max(top_10_muni_freq$n) * 1.2) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.45))) +
   labs(title = "Top 10 municipalities (frequency)", y = NULL, x = "Number of fires") +
   estil_tfm_horizontal()
 
-# --- SEVERITY PLOTS (HORIZONTALS) ---
-
-# P3: Província Area
+# P3 i P4 (Severitat)
 p3 <- ggplot(area_provincia, aes(y = reorder(provincia, total_area), x = total_area)) +
-  geom_col(fill = blue_palette[3], width = 0.7) +
+  geom_col(fill = blue_palette[3], width = 0.8) +
   geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
-  scale_x_continuous(labels = comma) +
-  expand_limits(x = max(area_provincia$total_area) * 1.2) +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.45))) +
   labs(title = "Burnt area by province", y = NULL, x = "Total area (ha)") +
   estil_tfm_horizontal()
 
-# P4: Municipi Area
 p4 <- ggplot(top_10_muni_area, aes(y = reorder(municipio, total_area), x = total_area)) +
-  geom_col(fill = blue_palette[4], width = 0.7) +
+  geom_col(fill = blue_palette[4], width = 0.8) +
   geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
-  scale_x_continuous(labels = comma) +
-  expand_limits(x = max(top_10_muni_area$total_area) * 1.2) +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.45))) +
   labs(title = "Top 10 municipalities (burnt area)", y = NULL, x = "Total area (ha)") +
   estil_tfm_horizontal()
 
-# 5. Assemblea final (2 columnes, 2 files)
+# --- ASSEMBLEA AMB MÉS ESPAI ENTRE COLUMNES ---
 final_plot <- (p1 + p2) / (p3 + p4) + 
+  plot_layout(widths = c(1, 1)) + # Força columnes iguals
   plot_annotation(
     title = 'Spatial impact analysis: frequency vs. severity',
     subtitle = 'Historical distribution across Catalonia (1998-2022)',
     theme = theme(
-      plot.title = element_text(size = 16, hjust = 0.5, face = "bold"),
-      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "grey40")
+      plot.title = element_text(size = 14, hjust = 0.5, face = "bold", margin = margin(b = 10)),
+      plot.subtitle = element_text(size = 11, hjust = 0.5, color = "grey40", margin = margin(b = 20)),
+      plot.margin = margin(15, 15, 15, 15)
     )
   )
+
 
 print(final_plot)
 ```
@@ -449,13 +495,67 @@ print(final_plot)
 
 The comparison between frequency and severity reveals a clear decoupling of fire patterns in Catalonia:
 
--   **The "Urban-Wildland Interface" (WUI) paradox**: Barcelona leads both in frequency (5,821 fires) and total area (35,430 ha), but at the municipal level, the pattern changes. Terrassa is the municipality with the highest number of ignitions (210), likely due to its large perimeter in contact with forest areas (high human activity). However, it does not even appear in the "Top 10" of burnt area. This suggests that while ignitions are frequent near large cities, suppression is usually very fast and effective.
+-   **The "Urban-Wildland Interface" (WUI) paradox**: Barcelona leads both in frequency (5,821 fires) and total area (35,430 ha), but at the municipal level, the pattern changes. Terrassa is the municipality with the highest number of ignitions (210), likely due to its large perimeter in contact with forest areas (high human activity). However, it does not even appear in the "Top 10" of burnt area. This pattern could suggest that while ignitions are frequent near large urban centers, fire suppression might be more rapid and effective in these areas.
 
--   **High-intensity hotspots**: Contrastingly, Aguilar de Segarra leads the severity ranking with 12,515 ha burnt, despite not being a leader in frequency. This indicates that this area is prone to Large Wildfires, where a single event can cause more ecological damage than hundreds of small ignitions in the metropolitan area.
-
--   **Strategic border areas**: La Jonquera stands out as a critical point. It ranks high in both frequency (187 fires) and burnt area (8,787 ha).
+-   **High-intensity hotspots**: Contrastingly, Aguilar de Segarra leads the severity ranking with 12,515 ha burnt, despite not being a leader in frequency. This could indicate that this area is more susceptible to Large Wildfires, where a single event might cause more ecological damage than numerous small ignitions in the metropolitan area.
 
 -   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
+
+
+
+```{r}
+# 1. Frequency Plot (Improved aesthetics)
+p1 <- wfc_final2 %>%
+  filter(!is.na(altitude_z)) %>%
+  ggplot(aes(x = altitude_z)) +
+  geom_histogram(binwidth = 100, fill = "#2C3E50", color = "white", alpha = 0.85) +
+  labs(
+    title = "Fire Frequency by Altitude",
+    subtitle = "Concentration of ignitions in lowlands",
+    x = "Altitude (m)",
+    y = "Number of Fires"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(face = "italic")
+  )
+
+# 2. Severity Plot (Clean & Professional)
+p2 <- wfc_final2 %>%
+  filter(!is.na(altitude_z)) %>%
+  ggplot(aes(x = altitude_z, y = superficie_total_forestal)) +
+  # We use hexbin-like logic or very light points to show density without noise
+  geom_point(alpha = 0.15, color = "#7F8C8D", size = 1) + 
+  geom_smooth(method = "gam", color = "#C0392B", fill = "#E6B0AA", size = 1.2) + 
+  scale_y_log10(labels = scales::comma) +
+  labs(
+    title = "Fire Severity by Altitude",
+    subtitle = "Burnt area trend (log scale)",
+    x = "Altitude (m)",
+    y = "Burnt Area (ha)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(face = "italic")
+  )
+
+# 3. Combine both plots side-by-side
+# This is where magic happens with patchwork
+combined_plot <- p1 + p2 + 
+  plot_annotation(
+    title = "Topographic Analysis of Wildfire Patterns in Catalonia (1998-2022)",
+    theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+  )
+
+# Display the result
+combined_plot
+```
+
+
 
 # Chapter 3: The meteorological dimension
 
@@ -479,9 +579,9 @@ ggplot(wfc_final2, aes(x = tx, y = ppt)) +
 
 The scatter plot and density analysis presented in the previous plot illustrate the climatic envelope in which wildfires occur in Catalonia. This "fingerprint" reveals a critical dependence on specific atmospheric conditions for fire spread and intensification.
 
--   **The zero-precipitation constraint**: A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density heatmap (indicated by the lighter yellow tones) confirms that the vast majority of fires occur under conditions of absolute lack of immediate rainfall. This confirms that while a fire can start at various temperatures, it rarely prospers or even occurs if there is significant moisture from recent precipitation.
+-   **The zero-precipitation constraint**: A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density heatmap (indicated by the lighter yellow tones) confirms that the vast majority of fires occur under conditions of absolute lack of immediate rainfall. This points to a strong inverse correlation between moisture availability and fire occurrence, indicating that recent precipitation may act as a critical limiting factor for ignition and subsequent spread.
 
--   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 20°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges due to fuel volatility.
+-   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 15°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges due to fuel volatility.
 
 -   **Atmospheric "Dry windows"**: There are occasional ignitions at higher precipitation levels (up to 60-70 mm), but these remain isolated, small-scale events (dots with almost no radius). This suggests that even if an ignition occurs during a rainy period, the lack of fuel continuity or the high fuel moisture content prevents the fire from gaining significant size.
 
@@ -512,7 +612,7 @@ The historical evolution of the average maximum temperature (**TX**) during igni
 
 -   **Positive linear trend**: The dashed regression line shows a steady upward trend over the 25-year period. This indicates that, on average, wildfires in Catalonia are occurring under increasingly hotter conditions. Even if the slope appears gradual, in ecological terms, a consistent rise in the thermal baseline significantly reduces fuel moisture and expands the annual "fire window."
 
--   **Interannual volatility**: The red line shows high variability, with extreme thermal peaks such as the one recorded in **2003** (surpassing 30°C on average). This specific peak correlates with one of the most severe heatwaves in European history, which led to catastrophic wildfire seasons in the Mediterranean. Similar, though less extreme, peaks are visible in **2006**, **2009**, and more recently in the **2017-2020** period.
+-   **Interannual volatility**: The red line shows high variability, with extreme thermal peaks such as the one recorded in **2003** (surpassing 30°C on average)[@martinez2003]. This specific peak correlates with one of the most severe heatwaves in European history, which led to catastrophic wildfire seasons in the Mediterranean. Similar, though less extreme, peaks are visible in **2006**, **2009**, and more recently in the **2017-2020** period.
 
 -   **A new thermal plateau**: It is noteworthy that since 2015, the annual average **TX** for fire days has rarely dropped below 26°C, whereas in the first decade of the series (1998-2008), values below 25°C were much more frequent. This suggests a "thermal hardening" of the environment, where the minimum conditions required for fire propagation are becoming more extreme.
 
@@ -593,7 +693,7 @@ The analysis of wildfire impact across different land cover types reveals a crit
 
 -   **The herbaceous crop paradox**: While ranking third in frequency, Herbaceous crops represent the largest total burnt area, **exceeding 25,500 hectares**. This indicates that although fires may start less frequently in agricultural zones compared to forests, they tend to propagate much faster across open fields, affecting vast extensions in shorter timeframes.
 
--   **Shrublands as a constant threat**: Shrublands maintain a high-pressure profile in both metrics, ranking second in frequency (2,745) and second in burnt area (22,276 ha). These areas often act as "ecological bridges," allowing low-intensity fires to transition from agricultural fringes into dense forest cores.
+-   **Shrublands as a constant threat**: Shrublands maintain a high-pressure profile in both metrics, ranking second in frequency (2,745) and second in burnt area (22,276 ha). 
 
 -   **Relative resilience of deciduous forests**: In contrast, dense deciduous broadleaf forests show significantly lower total burnt areas (7,661 ha). This may be attributed to higher fuel moisture retention and the lower flammability of broadleaf litter compared to needle-leaf species.
 
@@ -637,7 +737,7 @@ p7 <- ggplot(top_15_causes_freq, aes(y = reorder(causa, frequency), x = frequenc
   geom_col(fill = cause_palette[2], width = 0.7) +
   geom_text(aes(label = frequency), hjust = -0.2, size = 3, fontface = "bold") +
   expand_limits(x = max(top_15_causes_freq$frequency) * 1.2) +
-  labs(title = "Top 15 fire causes by frequency", y = NULL, x = "Number of fires") +
+  labs(title = "Top 10 fire causes by frequency", y = NULL, x = "Number of fires") +
   estil_causes_tfm()
 
 # P8: Top 15 Causes by Burnt Area
@@ -646,14 +746,14 @@ p8 <- ggplot(top_15_causes_area, aes(y = reorder(causa, total_area), x = total_a
   geom_text(aes(label = scales::comma(round(total_area))), hjust = -0.2, size = 3, fontface = "bold") +
   scale_x_continuous(labels = scales::comma) +
   expand_limits(x = max(top_15_causes_area$total_area) * 1.25) +
-  labs(title = "Top 15 fire causes by burnt area", y = NULL, x = "Total area (ha)") +
+  labs(title = "Top 10 fire causes by burnt area", y = NULL, x = "Total area (ha)") +
   estil_causes_tfm()
 
 # 3. Assemblea final (un sota l'altre)
 causes_plot_final <- p7 / p8 + 
   plot_annotation(
     title = "Analysis of ignition sources",
-    subtitle = "Top 15 most frequent and impactful causes (1998-2022)",
+    subtitle = "Top 10 most frequent and impactful causes (1998-2022)",
     theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold", color = "#800026"))
   )
 
@@ -664,7 +764,7 @@ The investigation into the origins of wildfires in Catalonia (1998-2022) reveals
 
 -   **The critical impact of arson**: The category "[400] Intencionado" is the primary driver of the fire problem in Catalonia. It not only records the highest frequency with **3,548 ignitions** but also results in the largest ecological footprint, accounting for **30,435 hectares burnt**.
 
--   **Negligence and infrastructure**: While intentional fires lead in severity, a significant portion of the total area is lost due to technical and human failures. "[320] Otras causas por líneas eléctricas" represents a major risk factor: although it is not in the top three for frequency, it ranks second in burnt area (**18,736 ha**). This suggests that utility-related fires often occur in remote or forested areas where detection is slower and suppression more complex.
+-   **Negligence and infrastructure**: While intentional fires lead in severity, a significant portion of the total area is lost due to technical and human failures. "[320] Otras causas por líneas eléctricas" represents a major risk factor: although it is not in the top three for frequency, it ranks second in burnt area (**18,736 ha**). 
 
 -   **Smoking and public awareness**: The category "[250] Fumadores" remains a persistent threat, appearing prominently in both charts. With over **800 fires** and **14,255 hectares** destroyed, it underscores the ongoing need for public awareness campaigns regarding the disposal of cigarette butts, especially near road networks and forest interfaces.
 
@@ -716,55 +816,9 @@ To refine the prevention strategies against intentional fires, it is essential t
 
 -   **Atypical drivers**: The data also captures marginal but significant behaviors, such as **"[464] Venganzas"** (Revenge) and, interestingly, **"[471] Incendios para distraer a la policía"**. These indicators highlight that wildfires are occasionally used as instruments of social conflict or as tactical diversions for other criminal activities.
 
-# Chapter 6: The climate change and thermal extremes
 
-```{r warning=FALSE, message=FALSE}
-# 2. Afegim una columna de text personalitzada per al "tooltip" (el que es llegirà en passar el ratolí)
-# Això farà que la interacció sigui molt més informativa.
-wfc_final2 <- wfc_final2 %>%
-  mutate(text_interactiu = paste0("Municipi: ", municipio, 
-                                  "<br>Any: ", year,
-                                  "<br>Temp. Máxima (TX): ", tx, "°C",
-                                  "<br>Superfície: ", comma(superficie_total_forestal), " ha",
-                                  "<br>Amplitud Tèrmica: ", round(thermal_amplitude, 1), "°C"))
 
-# 3. Creem el ggplot assignant el text al paràmetre 'text'
-p_clima <- ggplot(wfc_final2, aes(x = tx, y = superficie_total_forestal, text = text_interactiu)) +
-  geom_point(aes(color = thermal_amplitude), alpha = 0.5, size = 2) +
-  scale_y_log10(labels = scales::comma) + 
-  scale_color_viridis_c(option = "inferno", name = "Thermal Amplitude") +
-  geom_smooth(method = "lm", color = "black", linetype = "dashed") +
-  theme_minimal() +
-  labs(
-    title = "The heat threshold: Max temperature vs. fire severity",
-    x = "Maximum temperature (TX) at ignition (°C)",
-    y = "Total burnt area (ha) [log10]"
-  )
-
-# 4. Convertim a gràfic interactiu
-# L'argument tooltip="text" fa que només es mostri la nostra etiqueta personalitzada
-ggplotly(p_clima, tooltip = "text")
-```
-
-In the Mediterranean basin, climate change acts as a "force multiplier." It does not necessarily increase the number of ignitions---which remain largely anthropogenic---but it drastically alters the environment's receptivity to fire. This chapter analyzes how thermal thresholds dictate the transition from routine fire events to uncontrollable Large Wildfires.
-
-## Thermal thresholds and fire severity
-
-The relationship between **Maximum Temperature (TX)** and the **total burnt area** provides a clear visualization of the "heat threshold".
-
--   **The 30°C inflection point**: Statistical density increases significantly when TX exceeds 30°C. While suppression forces are highly effective at lower temperatures, the "ceiling" of fire size rises exponentially once this thermal barrier is crossed.
-
--   **The extremes vs. the average**: Although the linear trend of fire size remains relatively stable across the temperature spectrum due to efficient initial attack, the most severe events (\>500 ha) are exclusively concentrated in the high-temperature range. This confirms that extreme heat creates a "window of opportunity" for fires to escape suppression.
-
-## Thermal amplitude and fuel desiccation
-
-The variable **`thermal_amplitude`** serves as a critical proxy for relative humidity and atmospheric stability.
-
--   **Atmospheric dryness**: High amplitude values (where $TX - TN > 20°C$) are strongly correlated with the most impactful wildfires in the 25-year series.
-
--   **Fire intensity**: Fires occurring under high thermal amplitude conditions exhibit higher flame lengths and faster rates of spread, as the low overnight recovery (**TN**) prevents the fuel from regaining moisture.
-
-# Chapter 7: Predictive Modeling using Random Forest
+# Chapter 6: Predictive Modeling using Random Forest
 
 ## Model architecture and objective
 
@@ -875,8 +929,12 @@ The primary value of the model lies in its **Permutation Importance**, which ide
 
 -   **Anthropogenic drivers**: The variable **`causa`** ranks significantly high, reinforcing the idea that intentionality or specific types of negligence (as seen in Chapter 3) are not just frequency issues but indicators of potentially more severe fires.
 
-## Discussion and conclusions
+# Discussion and conclusions
 
 The Random Forest results validate that fire severity in Catalonia is a multi-causal phenomenon. The model successfully identifies **location and thermal stress (TX)** as the primary "engines" of fire size.
 
 Interestingly, the low importance of **`ppt`** (Precipitation) suggests that, for the studied series, the immediate temperature and location are more decisive at the moment of ignition than recent rainfall. These insights are vital for forest management, indicating that resources should be strategically pre-positioned based on **geographic risk zones** and **thermal peaks** rather than relying solely on general seasonal trends.
+
+# References
+
+-   Martínez Navarro, Ferran, Simón-Soria, Fernando, & López-Abente, Gonzalo. (2004). Valoración del impacto de la ola de calor del verano de 2003 sobre la mortalidad. Gaceta Sanitaria, 18(Supl. 1), 250-258. <http://scielo.isciii.es/scielo.php?script=sci_arttext&pid=S0213-91112004000400040&lng=es&tlng=es>.
