@@ -27,7 +27,7 @@ references:
   URL: "http://scielo.isciii.es/scielo.php?script=sci_arttext&pid=S0213-91112004000400040"
 ---
 
-```{r}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
@@ -60,7 +60,7 @@ library(tidyr)
 library(corrplot)
 library(caret)
 library(ranger)
-
+library(pROC)
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
@@ -1057,4 +1057,3 @@ This study successfully demonstrates that machine learning, specifically the Ran
 
 # References
 
--   Martínez Navarro, Ferran, Simón-Soria, Fernando, & López-Abente, Gonzalo. (2004). Valoración del impacto de la ola de calor del verano de 2003 sobre la mortalidad. Gaceta Sanitaria, 18(Supl. 1), 250-258. <http://scielo.isciii.es/scielo.php?script=sci_arttext&pid=S0213-91112004000400040&lng=es&tlng=es>.
