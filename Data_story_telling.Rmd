@@ -311,7 +311,6 @@ wfc_final2 <- wfc_final2 %>%
   left_join(land_cover_lookup, by = "land_cover_id")
 ```
 
-
 ```{r warning=FALSE, message=FALSE}
 # INTERACTIVE MAP: SPATIAL IMPACT AND MAXIMUM TEMPERATURE (TX)
 
@@ -390,8 +389,6 @@ bscols(
 )
 ```
 
-
-
 ### Where does Catalonia burn?
 
 This interactive map bridges the gap between raw data and territorial management:
@@ -400,9 +397,9 @@ This interactive map bridges the gap between raw data and territorial management
 
 -   **Magnitude vs. frequency**: Use the slider to see how certain years were dominated by many small fires, while others were defined by a few Large Forest Fires.
 
-- **Thermal intensity**: The color of the markers represents the maximum temperature ($TX$) recorded on the day of the ignition. A shift towards darker red tones indicates more extreme thermal conditions.
+-   **Thermal intensity**: The color of the markers represents the maximum temperature ($TX$) recorded on the day of the ignition. A shift towards darker red tones indicates more extreme thermal conditions.
 
-- **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
+-   **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
 
 -   **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
 
@@ -501,19 +498,23 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 -   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
 
+# Chapter 3: The geospatial dimension: Topography 
 
+## The altitude threshold: frequency vs. severity
 
-```{r}
+The interaction between topography and wildfire dynamics in Catalonia reveals a distinct dual behavior when comparing fire frequency against fire severity.
+
+```{r warning=FALSE, message=FALSE}
 # 1. Frequency Plot (Improved aesthetics)
 p1 <- wfc_final2 %>%
   filter(!is.na(altitude_z)) %>%
   ggplot(aes(x = altitude_z)) +
   geom_histogram(binwidth = 100, fill = "#2C3E50", color = "white", alpha = 0.85) +
   labs(
-    title = "Fire Frequency by Altitude",
+    title = "Fire frequency by altitude",
     subtitle = "Concentration of ignitions in lowlands",
     x = "Altitude (m)",
-    y = "Number of Fires"
+    y = "Number of fires"
   ) +
   theme_minimal(base_size = 12) +
   theme(
@@ -525,16 +526,22 @@ p1 <- wfc_final2 %>%
 # 2. Severity Plot (Clean & Professional)
 p2 <- wfc_final2 %>%
   filter(!is.na(altitude_z)) %>%
+  # Opcional: Filtrem valors extremadament petits per netejar el gràfic
+  filter(superficie_total_forestal >= 0.01) %>% 
   ggplot(aes(x = altitude_z, y = superficie_total_forestal)) +
-  # We use hexbin-like logic or very light points to show density without noise
   geom_point(alpha = 0.15, color = "#7F8C8D", size = 1) + 
   geom_smooth(method = "gam", color = "#C0392B", fill = "#E6B0AA", size = 1.2) + 
-  scale_y_log10(labels = scales::comma) +
+  # Fixem els límits de l'eix Y (limits) i eliminem l'espai sobrant (expand)
+  scale_y_log10(
+    limits = c(0.01, 10000), 
+    labels = scales::comma, 
+    expand = c(0, 0)
+  ) +
   labs(
-    title = "Fire Severity by Altitude",
-    subtitle = "Burnt area trend (log scale)",
+    title = "Fire severity by altitude",
+    subtitle = "Burnt area trend (log scale, >0.01 ha)",
     x = "Altitude (m)",
-    y = "Burnt Area (ha)"
+    y = "Burnt area (ha)"
   ) +
   theme_minimal(base_size = 12) +
   theme(
@@ -547,7 +554,7 @@ p2 <- wfc_final2 %>%
 # This is where magic happens with patchwork
 combined_plot <- p1 + p2 + 
   plot_annotation(
-    title = "Topographic Analysis of Wildfire Patterns in Catalonia (1998-2022)",
+    title = "Topographic analysis of wildfire patterns in Catalonia (1998-2022)",
     theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
   )
 
@@ -555,9 +562,26 @@ combined_plot <- p1 + p2 +
 combined_plot
 ```
 
+### Fire frequency: The lowland pressure
+
+The left panel (**Fire frequency by altitude**) demonstrates a heavy concentration of ignition events in the lowlands:
+
+-   **Human-Wildland Interface**: Over 80% of ignitions occur below 600 meters. This concentration coincides with areas of higher population density, infrastructure, and agricultural activity, suggesting that human-caused ignitions (accidental or intentional) are the primary driver of fire frequency.
+
+-   **The 1,000m barrier**: There is a sharp decline in the number of fires above 1,000 meters. This is likely due to shorter fire seasons in alpine environments, higher humidity levels, and significantly less human presence.
+
+### Fire severity: The mid-altitude challenge
+
+The right panel (**Fire severity by altitude**) provides a more complex perspective by analyzing the burnt area (log scale) across the same elevation gradient:
+
+-   **Decoupling frequency from severity**: While most fires happen near sea level, the **GAM trend line** (red) shows that the average severity (burnt area) does not decrease linearly with altitude. Instead, it fluctuates and even peaks at mid-elevations (approx. 500m and 1,000m).
+
+-   **The 1,000-meter peak**: A notable increase in the severity trend is observed around 1,000 meters. This peak suggests that when an ignition does occur at this altitude, it often involves more continuous forest fuels and more challenging topographic conditions for suppression, leading to larger burnt areas despite the lower frequency of events.
+
+-   **Lower bound threshold**: By filtering events below 0.01 ha, we observe that "noise" from very small ignitions is mostly concentrated at low altitudes, whereas high-altitude events, though rarer, tend to have a higher "baseline" of severity.
 
 
-# Chapter 3: The meteorological dimension
+# Chapter 4: The meteorological dimension
 
 ```{r warning=FALSE, message=FALSE}
 # Gràfic de densitat: On es concentren els incendis segons Clima?
@@ -618,7 +642,7 @@ The historical evolution of the average maximum temperature (**TX**) during igni
 
 -   **The confidence interval**: The grey shaded area (confidence interval) widening towards the end of the series reflects the increasing unpredictability and frequency of extreme events. While some years still show lower averages due to specific rainy summers, the overall trajectory is towards a hotter ignitions environment.
 
-# Chapter 4: Land cover and ecosystem vulnerability
+# Chapter 5: Land cover and ecosystem vulnerability
 
 ```{r}
 # 1. Preparació de dades 
@@ -693,13 +717,13 @@ The analysis of wildfire impact across different land cover types reveals a crit
 
 -   **The herbaceous crop paradox**: While ranking third in frequency, Herbaceous crops represent the largest total burnt area, **exceeding 25,500 hectares**. This indicates that although fires may start less frequently in agricultural zones compared to forests, they tend to propagate much faster across open fields, affecting vast extensions in shorter timeframes.
 
--   **Shrublands as a constant threat**: Shrublands maintain a high-pressure profile in both metrics, ranking second in frequency (2,745) and second in burnt area (22,276 ha). 
+-   **Shrublands as a constant threat**: Shrublands maintain a high-pressure profile in both metrics, ranking second in frequency (2,745) and second in burnt area (22,276 ha).
 
 -   **Relative resilience of deciduous forests**: In contrast, dense deciduous broadleaf forests show significantly lower total burnt areas (7,661 ha). This may be attributed to higher fuel moisture retention and the lower flammability of broadleaf litter compared to needle-leaf species.
 
 -   **Urban and infrastructure pressure**: The appearance of the Road network and Urban expansion in the burnt area rankings highlights the increasing risk at the Wildland-Urban Interface (WUI), where human activity acts as a primary driver of landscape transformation through fire.
 
-# Chapter 5: Analysis of ignition sources and drivers
+# Chapter 6: Analysis of ignition sources and drivers
 
 ```{r}
 # 1. Preparació de dades de causes (Top 15)
@@ -764,7 +788,7 @@ The investigation into the origins of wildfires in Catalonia (1998-2022) reveals
 
 -   **The critical impact of arson**: The category "[400] Intencionado" is the primary driver of the fire problem in Catalonia. It not only records the highest frequency with **3,548 ignitions** but also results in the largest ecological footprint, accounting for **30,435 hectares burnt**.
 
--   **Negligence and infrastructure**: While intentional fires lead in severity, a significant portion of the total area is lost due to technical and human failures. "[320] Otras causas por líneas eléctricas" represents a major risk factor: although it is not in the top three for frequency, it ranks second in burnt area (**18,736 ha**). 
+-   **Negligence and infrastructure**: While intentional fires lead in severity, a significant portion of the total area is lost due to technical and human failures. "[320] Otras causas por líneas eléctricas" represents a major risk factor: although it is not in the top three for frequency, it ranks second in burnt area (**18,736 ha**).
 
 -   **Smoking and public awareness**: The category "[250] Fumadores" remains a persistent threat, appearing prominently in both charts. With over **800 fires** and **14,255 hectares** destroyed, it underscores the ongoing need for public awareness campaigns regarding the disposal of cigarette butts, especially near road networks and forest interfaces.
 
@@ -816,9 +840,7 @@ To refine the prevention strategies against intentional fires, it is essential t
 
 -   **Atypical drivers**: The data also captures marginal but significant behaviors, such as **"[464] Venganzas"** (Revenge) and, interestingly, **"[471] Incendios para distraer a la policía"**. These indicators highlight that wildfires are occasionally used as instruments of social conflict or as tactical diversions for other criminal activities.
 
-
-
-# Chapter 6: Predictive Modeling using Random Forest
+# Chapter 7: Predictive Modeling using Random Forest
 
 ## Model architecture and objective
 
