@@ -498,7 +498,7 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 -   **Regional efficiency**: While Lleida has the lowest frequency and total burnt area among the four provinces, its municipalities like Artesa de Segre or Agramunt appear in the top severity list.
 
-# Chapter 3: The geospatial dimension: Topography 
+# Chapter 3: The geospatial dimension: Topography
 
 ## The altitude threshold: frequency vs. severity
 
@@ -579,7 +579,6 @@ The right panel (**Fire severity by altitude**) provides a more complex perspect
 -   **The 1,000-meter peak**: A notable increase in the severity trend is observed around 1,000 meters. This peak suggests that when an ignition does occur at this altitude, it often involves more continuous forest fuels and more challenging topographic conditions for suppression, leading to larger burnt areas despite the lower frequency of events.
 
 -   **Lower bound threshold**: By filtering events below 0.01 ha, we observe that "noise" from very small ignitions is mostly concentrated at low altitudes, whereas high-altitude events, though rarer, tend to have a higher "baseline" of severity.
-
 
 # Chapter 4: The meteorological dimension
 
@@ -842,7 +841,9 @@ To refine the prevention strategies against intentional fires, it is essential t
 
 # Chapter 7: Predictive Modeling using Random Forest
 
-## Model architecture and objective
+## Regresion Random Forest
+
+### Model architecture and objective
 
 In this stage, a Random Forest regressor was implemented to quantify the predictive power of environmental and anthropogenic variables over fire severity (Burnt Area). Random Forest was selected due to its robustness against outliers and its ability to capture non-linear relationships, which are prevalent in wildfire dynamics.
 
@@ -855,13 +856,13 @@ wfc_model_final <- wfc_final2 %>%
     superficie_total_forestal, 
     
     # Location
-    county_clean, altitude_z, latitude, longitude,
+    altitude_z, latitude, longitude,
     
     # Meteorology
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,year,
+    month_detected, hour_detected,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -931,13 +932,13 @@ To quantify the drivers of fire severity, a **Random Forest** regression model w
 
 The model evaluation on the test set yielded the following metrics:
 
--   **RMSE**: 0.692
+-   **RMSE**: 0.694
 
--   **R-squared (**$R^2$): 0.151
+-   **R-squared (**$R^2$): 0.146
 
 -   **MAE**: 0.377
 
-While an $R^2$ of **15.1%** might appear low in other disciplines, in wildfire science, it reflects the inherent complexity and "noise" of fire behavior. Predicting the final size of a fire at the moment of ignition is a major challenge, as it depends on dynamic factors not fully captured in static datasets, such as suppression efficiency, wind shifts, and fuel connectivity.
+While an $R^2$ of **14,6%** might appear low in other disciplines, in wildfire science, it reflects the inherent complexity and "noise" of fire behavior. Predicting the final size of a fire at the moment of ignition is a major challenge, as it depends on dynamic factors not fully captured in static datasets, such as suppression efficiency, wind shifts, and fuel connectivity.
 
 ## Drivers of severity: variable importance analysis
 
@@ -945,17 +946,114 @@ The primary value of the model lies in its **Permutation Importance**, which ide
 
 -   **Geospatial predominance**: **Longitude** and **Latitude** are the top predictors. This suggests a strong spatial component in Catalonia, where specific geographic corridors are more prone to large-scale events due to persistent wind patterns or topographical funnels.
 
--   **The "WUI" and territorial context**: The high importance of **`county_clean`** and **`afecto_zonas_interfaz_urbano_forestal`** (WUI) confirms that the territorial mosaic and proximity to human settlements are critical. Fires near urban interfaces are often more complex to manage, as resources must be split between forest suppression and structural protection.
+-   **The "WUI" and territorial context**: The high importance of **`afecto_zonas_interfaz_urbano_forestal`** (WUI) confirms that the proximity to human settlements are critical. Fires near urban interfaces are often more complex to manage, as resources must be split between forest suppression and structural protection.
 
 -   **Topography and climate**: **`altitude_z`** and **`tx`** (Maximum Temperature) appear as key environmental drivers. Higher temperatures lower the fuel's ignition threshold, while altitude influences both vegetation type and accessibility for ground crews.
 
--   **Anthropogenic drivers**: The variable **`causa`** ranks significantly high, reinforcing the idea that intentionality or specific types of negligence (as seen in Chapter 3) are not just frequency issues but indicators of potentially more severe fires.
+-   **Anthropogenic drivers**: The variable **`causa`** ranks significantly high, reinforcing the idea that intentionality or specific types of negligence (as seen in Chapter 6) are not just frequency issues but indicators of potentially more severe fires.
+
+## Classification Random Forest
+
+### From continuous to categorical: defining severity classes
+
+While regression provides a continuous estimate of fire size, from a forest management and emergency response perspective, it is often more actionable to categorize fires based on their potential risk. Therefore, a second modeling stage was developed using a Random Forest Classifier.
+
+To define the boundary between "Low" and "High" severity classes, the distribution of the historical record (1998-2022) was analyzed. Given that the dataset is heavily dominated by small ignitions (Median = 0.07 ha), a fixed threshold of 10 ha---often used in general literature---was discarded in favor of a data-driven approach.
+
+The arithmetic mean (6.67 ha) was selected as the classification threshold. This decision is statistically justified as it isolates the top 3.6% of events (525 fires), which represent the fires that deviate significantly from the central tendency and account for the vast majority of the total burnt area in Catalonia.
+
+```{r}
+# Creem la classe binària (Severity)
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+
+# 1. Separació inicial (Hold-out)
+set.seed(123)
+train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
+train_set <- wfc_model_final[train_index, ]
+test_set  <- wfc_model_final[-train_index, ]
+
+# 1. Afegim 'sampling = "down"' al trainControl
+fitControl <- trainControl(
+  method = "cv",
+  number = 10,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  savePredictions = "final",
+  sampling = "down" 
+)
+
+rf_final_model <- train(
+  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data = train_set,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "ROC", 
+  importance = "permutation"
+)
+
+# Prediccions sobre el test_set
+final_preds <- predict(rf_final_model, newdata = test_set)
+final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+
+# 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
+conf_matrix <- confusionMatrix(final_preds, test_set$severity)
+print(conf_matrix)
+
+# 2. AUC-ROC 
+roc_obj <- roc(test_set$severity, final_probs$High)
+auc_value <- auc(roc_obj)
+print(paste("AUC final del model:", auc_value))
+
+# 1. Extraure la importància
+importancia_data <- varImp(rf_final_model, scale = FALSE)
+
+# 2. Seleccionar només les 10 més importants
+plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
+```
+
+## Model setup and performance metrics
+
+The Random Forest classifier yielded a robust performance in predicting high-severity wildfire events (\>$6.67$ ha). The model achieved an AUC-ROC of 0.746, indicating a strong discriminative ability to distinguish between routine ignitions and significant fire events.
+
+The results from the confusion matrix on the independent test set demonstrate a balanced predictive capacity:
+
+-   **Sensitivity (recall): 67.3%**. The model successfully identifies two out of every three high-severity fires, which is a critical threshold for early warning and resource allocation.
+
+-   **Specificity: 68.5%**. The model correctly filters out approximately $69\%$ of low-severity fires, maintaining a consistent performance across both classes.
+
+-   **Balanced accuracy: 67.9%**. Given the extreme class imbalance (only $3.6\%$ prevalence of "High" severity), this metric confirms that the downsampling strategy effectively prevented the model from being biased toward the majority class.
+
+## Drivers of severity: variable importance analysis
+
+The variable importance analysis (permutation-based) reveals that **geospatial coordinates and climatic factors** are the primary drivers of fire severity in Catalonia:
+
+1.  **Geographic gradient (longitude and latitude)**: These emerged as the most influential predictors. This suggests that specific regional patterns are fundamental in determining whether an ignition escalates into a large fire.
+
+2.  **Meteorological conditions (`tx`)**: Maximum temperature ranks as the top climatic driver. This confirms the direct relationship between extreme heat episodes and the loss of suppression capacity.
+
+3.  **Temporal and topographic factors**: The hour of detection (`hour_detected`) and altitude (`altitude_z`) also play significant roles. The importance of altitude aligns with our previous topographic analysis, highlighting mid-elevation zones as high-risk areas for fire spread.
+
+4.  **Anthropogenic influence**: Interestingly, "Smokers" (`causa[250] Fumadores`) and proximity to the **Urban-Wildland Interface (WUI)** appear within the top 10 drivers, suggesting that human activity not only triggers fires but also influences the severity context, likely due to the complexity of extinguishing fires near populated areas.
 
 # Discussion and conclusions
 
-The Random Forest results validate that fire severity in Catalonia is a multi-causal phenomenon. The model successfully identifies **location and thermal stress (TX)** as the primary "engines" of fire size.
+## Discussion: The dual nature of fire frediction
 
-Interestingly, the low importance of **`ppt`** (Precipitation) suggests that, for the studied series, the immediate temperature and location are more decisive at the moment of ignition than recent rainfall. These insights are vital for forest management, indicating that resources should be strategically pre-positioned based on **geographic risk zones** and **thermal peaks** rather than relying solely on general seasonal trends.
+The implementation of a dual Random Forest approach (Regression and Classification) provides a comprehensive understanding of the wildfire regime in Catalonia. While the regression model highlights the continuous drivers of fire size, the classification model---centered on the data-driven threshold of **6.67 ha**---allows us to identify the specific conditions that lead to high-severity events.
+
+The results validate that fire severity is a **multi-causal and spatially-dependent phenomenon**. The prominence of **Longitude and Latitude** as top predictors in the classification model suggests that the geographic context (topography, fuel continuity, and distance to the coast) acts as a foundational risk layer. This spatial backbone is then "activated" by meteorological triggers, primarily **Maximum Temperature (TX)**, which emerged as the most critical climatic engine in both models.
+
+A key finding is the relatively low importance of **Precipitation (PPT)** compared to thermal stress and location. This suggests that, in the Mediterranean context, the immediate flammability caused by heat peaks and the geographic layout are more decisive at the moment of ignition than recent rainfall patterns. Furthermore, the inclusion of **"Smokers"** and the **Urban-Wildland Interface (WUI)** in the top drivers highlights the undeniable anthropogenic footprint on fire severity, where human activity not only increases ignition probability but also complicates suppression efforts in high-risk zones.
+
+## Conclusions
+
+This study successfully demonstrates that machine learning, specifically the Random Forest algorithm, can effectively navigate the high noise and complexity of wildfire data. The main conclusions are summarized as follows:
+
+1.  **Predictive robustness**: The classification model achieved a solid **AUC of 0.746**, with a **sensitivity of 67.3%**. This confirms that it is possible to anticipate two-thirds of high-severity fires using a combination of geographic, meteorological, and anthropogenic variables.
+
+2.  **Geographic priority**: The high importance of coordinates and altitude justifies the transition towards **spatialized forest management**. Resources should be strategically pre-positioned based on these identified geographic risk corridors rather than relying on uniform seasonal trends.
+
+3.  **Threshold significance**: Moving away from arbitrary thresholds to a data-driven mean of **6.67 ha** proved essential for model stability. This threshold effectively isolates the **top 3.6% of fires**, which are responsible for the majority of the ecological and structural damage in Catalonia.
 
 # References
 
