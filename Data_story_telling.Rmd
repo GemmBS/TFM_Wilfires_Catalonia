@@ -62,6 +62,8 @@ library(caret)
 library(ranger)
 library(pROC)
 library(tibble)
+library(bslib)
+library(bsicons)
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
@@ -84,19 +86,27 @@ Wildfires are one of the most significant environmental threats in Catalonia. As
 -   **Bridge descriptive and predictive analysis**: To provide a visual foundation that justifies the variables used in our Random Forest predictive model.
 
 "*Data is the first step toward effective prevention. By visualizing the past 25 years, we can better prepare for the next season.*"
-
 ```{r}
-# In this first section, we can show a summary "Value Box" 
-# to show the total magnitude of the dataset.
 total_fires <- nrow(wfc_final2)
 total_area <- sum(wfc_final2$superficie_total_forestal, na.rm = TRUE)
 
-# Custom display using valueBoxes
-fluidRow(
-  valueBox(total_fires, subtitle = "Total Fires Recorded", icon = icon("fire", style = "color: #FF4500;"), color = "red"),
-  valueBox(round(total_area / 1000, 1), subtitle = "Total Thousand Ha Burnt", icon = icon("tree", style = "color: #2E8B57;"), color = "yellow")
+layout_column_wrap(
+  width = 1/2,
+  value_box(
+    title = "Total fires recorded",
+    value = total_fires,
+    showcase = bs_icon("fire"),
+    theme = "danger"
+  ),
+  value_box(
+    title = "Total thousand Ha burnt",
+    value = paste0(round(total_area / 1000, 1), "k"),
+    showcase = bs_icon("tree"),
+    theme = "warning"
+  )
 )
 ```
+
 
 # Chapter 1: The pulse of time (temporal analysis)
 
