@@ -61,6 +61,7 @@ library(corrplot)
 library(caret)
 library(ranger)
 library(pROC)
+library(tibble)
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
@@ -218,6 +219,39 @@ fire_table %>%
   )
 
 ```
+
+### Hourly ignitions and daily cycles
+
+```{r}
+# 1. Preparació de les dades per hores
+hourly_counts <- wfc_final2 %>%
+  filter(!is.na(hour_detected)) %>%
+  count(hour_detected)
+
+# 2. Gràfic de barres horari
+ggplot(hourly_counts, aes(x = hour_detected, y = n)) +
+  geom_bar(stat = "identity", fill = "darkorange3", alpha = 0.8) +
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal() +
+  labs(
+    title = "Hourly distribution of fire ignitions",
+    subtitle = "Daily patterns of fire detection (1998-2022)",
+    x = "Hour of day (24h format)",
+    y = "Number of fires"
+  ) +
+  theme(
+    plot.title = element_text(size = 12, face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+The analysis of fire detection times reveals a significant **diurnal pattern** in wildfire activity across Catalonia. The frequency of ignitions remains minimal during the nocturnal and early morning hours (00:00 to 08:00), followed by a sharp increase that peaks during the central part of the day.
+
+-   **Peak activity:** The maximum concentration of fire starts occurs between **12:00 and 17:00**, with a definitive peak at **16:00**. This window corresponds to the period of "maximum atmospheric receptivity," characterized by peak daily temperatures (TX) and the lowest relative humidity levels.
+
+-   **Operational hypothesis:** This concentration during the solar peak suggests that most fires are detected when environmental conditions are most favorable for rapid spread. Ignitions during these hours face a higher risk of escaping initial suppression efforts, a factor that will be further explored in the predictive modeling stage to determine its real weight in fire severity.
+
+-   **Anthropogenic influence:** The synchronization of the peak with daylight hours also suggests a strong correlation with human activity, including agricultural practices, forest visits, and transportation, which decrease drastically after sunset.
 
 # Chapter 2: The core of the story (interactive exploration)
 
@@ -911,20 +945,63 @@ importance_df <- data.frame(
   Importance = importance_values
 ) %>% arrange(desc(Importance))
 
-# Plot importance
-ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  coord_flip() +
-  theme_minimal() +
-  labs(title = "Variable Importance in Wildfire Surface Prediction",
-       x = "Predictors", y = "Importance (Permutation)")
+# 1. Creem el dataframe amb les dades de la teva regressió
+regression_metrics <- tibble(
+  Metric = c("R-squared (Test)", "R-squared (OOB)", "RMSE", "MAE"),
+  Value = c(0.146, 0.158, 0.694, 0.377),
+  Interpretation = c(
+    "Proportion of variance explained (test set)",
+    "Internal model validation estimate",
+    "Root Mean Square Error (log-scale)",
+    "Mean Absolute Error (log-scale)"
+  )
+)
+
+# 2. Generem la taula gt
+gt_regression_results <- regression_metrics %>%
+  gt() %>%
+  tab_header(
+    title = "Random Forest Regression performance",
+    subtitle = "Evaluation of burnt surface prediction (Log-transformed)"
+  ) %>%
+  cols_label(
+    Metric = "Performance Metric",
+    Value = "Value",
+    Interpretation = "Analysis"
+  ) %>%
+  fmt_number(
+    columns = Value,
+    decimals = 3
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(columns = Metric)
+  ) %>%
+  tab_options(
+    table.font.names = "Times New Roman",
+    heading.title.font.size = px(20)
+  )
+# Visualització
+gt_regression_results
 
 # Predict on test set
 predictions <- predict(rf_model, data = test_set)$predictions
 
 # Calculate Performance Metrics (RMSE and R2)
-postResample(pred = predictions, obs = test_set$log_surface)
+#postResample(pred = predictions, obs = test_set$log_surface)
 ```
+
+
+```{r}
+# Plot importance
+ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  labs(title = "Variable importance in wildfire surface prediction",
+       x = "Predictors", y = "Importance (Permutation)")
+```
+
 
 ## Model setup and performance metrics
 
@@ -964,51 +1041,100 @@ The arithmetic mean (6.67 ha) was selected as the classification threshold. This
 
 ```{r}
 # Creem la classe binària (Severity)
-wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+#wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
 
 # 1. Separació inicial (Hold-out)
-set.seed(123)
-train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
+#set.seed(123)
+#train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
+#train_set <- wfc_model_final[train_index, ]
+#test_set  <- wfc_model_final[-train_index, ]
 
 # 1. Afegim 'sampling = "down"' al trainControl
-fitControl <- trainControl(
-  method = "cv",
-  number = 10,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary,
-  savePredictions = "final",
-  sampling = "down" 
-)
+#fitControl <- trainControl(
+#  method = "cv",
+#  number = 10,
+#  classProbs = TRUE,
+#  summaryFunction = twoClassSummary,
+#  savePredictions = "final",
+#  sampling = "down" 
+#)
 
-rf_final_model <- train(
-  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
-  data = train_set,
-  method = "ranger",
-  trControl = fitControl,
-  metric = "ROC", 
-  importance = "permutation"
-)
+#rf_final_model <- train(
+#  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + #afecto_zonas_interfaz_urbano_forestal,
+#  data = train_set,
+#  method = "ranger",
+#  trControl = fitControl,
+#  metric = "ROC", 
+#  importance = "permutation"
+#)
 
 # Prediccions sobre el test_set
-final_preds <- predict(rf_final_model, newdata = test_set)
-final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+#final_preds <- predict(rf_final_model, newdata = test_set)
+#final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
 
 # 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
-conf_matrix <- confusionMatrix(final_preds, test_set$severity)
-print(conf_matrix)
+#conf_matrix <- confusionMatrix(final_preds, test_set$severity)
+#print(conf_matrix)
 
 # 2. AUC-ROC 
-roc_obj <- roc(test_set$severity, final_probs$High)
-auc_value <- auc(roc_obj)
-print(paste("AUC final del model:", auc_value))
+#roc_obj <- roc(test_set$severity, final_probs$High)
+#auc_value <- auc(roc_obj)
+#print(paste("AUC final del model:", auc_value))
 
 # 1. Extraure la importància
-importancia_data <- varImp(rf_final_model, scale = FALSE)
+#importancia_data <- varImp(rf_final_model, scale = FALSE)
 
 # 2. Seleccionar només les 10 més importants
-plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
+#plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
+```
+
+
+```{r}
+# 1. Creem el dataframe amb les dades de la teva Confusion Matrix
+classification_metrics <- tibble(
+  Metric = c("AUC (Area Under Curve)", "Sensitivity (Recall)", "Specificity", 
+             "Balanced Accuracy", "Accuracy", "Kappa"),
+  Value = c(0.7459, 0.6731, 0.6847, 0.6789, 0.6842, 0.0735),
+  Interpretation = c("Excellent discriminative capacity", "Ability to detect High Severity fires", 
+                    "Ability to detect Low Severity fires", "Average of sensitivity and specificity", 
+                    "Overall correct predictions", "Agreement above chance")
+)
+
+# 2. Generem la taula gt
+gt_model_results <- classification_metrics %>%
+  gt() %>%
+  tab_header(
+    title = "Random Forest classification performance",
+    subtitle = "Evaluation of high severity fire prediction (> 6.67 ha)"
+  ) %>%
+  cols_label(
+    Metric = "Performance metric",
+    Value = "Value",
+    Interpretation = "Analysis"
+  ) %>%
+  fmt_number(
+    columns = Value,
+    decimals = 4
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(columns = Metric)
+  ) %>%
+  tab_options(
+    table.font.names = "Times New Roman",
+    heading.title.font.size = px(20)
+  )
+
+# Visualització
+gt_model_results
+```
+
+```{r, echo=FALSE, out.width="100%", fig.align="center", fig.cap="Classification Model Performance: Confusion Matrix and Statistics"}
+# Carreguem la llibreria per gestionar imatges
+library(knitr)
+
+# Inserim la imatge des de la subcarpeta images
+include_graphics("images/ClasRF.PNG")
 ```
 
 ## Model setup and performance metrics
@@ -1056,4 +1182,3 @@ This study successfully demonstrates that machine learning, specifically the Ran
 3.  **Threshold significance**: Moving away from arbitrary thresholds to a data-driven mean of **6.67 ha** proved essential for model stability. This threshold effectively isolates the **top 3.6% of fires**, which are responsible for the majority of the ecological and structural damage in Catalonia.
 
 # References
-

@@ -273,6 +273,7 @@ auc_value <- auc(roc_obj)
 print(paste("AUC final del model:", auc_value))
 ```
 
+
 ```{r}
 # 1. Extraure la importància
 importancia_data <- varImp(rf_final_model, scale = FALSE)
