@@ -826,4 +826,3 @@ message("File successfully saved in: data/wfc_final2.csv")
 ```
 
 
-un amb els anys posats de manera consecutiva; un amb els mesos consecutius també; un amb tots els land covers
