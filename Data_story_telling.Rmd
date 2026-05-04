@@ -1165,7 +1165,7 @@ The variable importance analysis (permutation-based) reveals that **geospatial c
 
 # Discussion and conclusions
 
-## Discussion: The dual nature of fire frediction
+## Discussion: The dual nature of fire prediction
 
 The implementation of a dual Random Forest approach (Regression and Classification) provides a comprehensive understanding of the wildfire regime in Catalonia. While the regression model highlights the continuous drivers of fire size, the classification model---centered on the data-driven threshold of **6.67 ha**---allows us to identify the specific conditions that lead to high-severity events.
 
