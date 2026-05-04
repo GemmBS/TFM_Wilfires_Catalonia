@@ -445,91 +445,68 @@ This interactive map bridges the gap between raw data and territorial management
 
 -   **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
 
--   **Spatial patterns**: This visualization justifies why Latitude and Longitude became the most important variables in our predictive model.
 
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
-```{r warning=FALSE, message=FALSE}
-# 1. Preparació de dades (Top 10)
-top_10_muni_freq <- wfc_final2 %>%
-  count(municipio) %>%
-  slice_max(n, n = 10)
-
-top_10_muni_area <- wfc_final2 %>%
-  group_by(municipio) %>%
-  summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE)) %>%
-  slice_max(total_area, n = 10)
-
-area_provincia <- wfc_final2 %>%
-  group_by(provincia) %>%
-  summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE))
-
-# Paleta de blaus
-blue_palette <- c("#08306b", "#08519c", "#2171b5", "#4292c6")
-
-# --- FUNCIÓ D'ESTIL AMB MARGES EXTREMS ---
-estil_tfm_horizontal <- function() {
+```{r warning=FALSE, message=FALSE, fig.width=16, fig.height=12, out.width="100%"}
+# --- FUNCIÓ D'ESTIL PER A FORMAT GRAN ---
+estil_tfm_gran <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    # Títols una mica més petits per evitar que xoquin entre gràfics
-    plot.title = element_text(face = "bold", size = 10, color = "#2c3e50", margin = margin(b = 10)),
-    axis.text.y = element_text(size = 8.5), 
-    axis.text.x = element_text(size = 7.5),
+    # Títols més grans per a resolucions altes
+    plot.title = element_text(face = "bold", size = 14, color = "#2c3e50", margin = margin(b = 12)),
+    axis.title.x = element_text(size = 11, face = "italic"),
+    axis.text.y = element_text(size = 11), 
+    axis.text.x = element_text(size = 10),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
-    # Marge dret molt gran (40) per encabir els números del geom_text
-    plot.margin = margin(10, 40, 10, 5) 
+    # Marge dret generós per evitar que el text de les barres es talli
+    plot.margin = margin(t = 15, r = 60, b = 15, l = 10) 
   )
 }
 
-# --- APLICACIÓ ALS GRÀFICS AMB EXPANSIÓ DEL 45% ---
+# --- RE-GENERACIÓ DELS GRÀFICS AMB TEXT MÉS GRAN ---
 
-# P1 i P2 (Freqüència)
 p1 <- ggplot(wfc_final2, aes(y = reorder(provincia, provincia, function(x) length(x)), x = ..count..)) +
   geom_bar(fill = blue_palette[1], width = 0.7) +
-  geom_text(stat='count', aes(label=..count..), hjust=-0.2, size=3, fontface="bold") +
-  # El mult = c(0, 0.45) reserva gairebé la meitat del gràfic per al text a la dreta
-  scale_x_continuous(expand = expansion(mult = c(0, 0.45))) +
+  geom_text(stat='count', aes(label=..count..), hjust=-0.2, size=4.5, fontface="bold") +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.3))) +
   labs(title = "Fire frequency by province", y = NULL, x = "Number of fires") +
-  estil_tfm_horizontal()
+  estil_tfm_gran()
 
 p2 <- ggplot(top_10_muni_freq, aes(y = reorder(municipio, n), x = n)) +
   geom_col(fill = blue_palette[2], width = 0.8) +
-  geom_text(aes(label=n), hjust=-0.2, size=3, fontface="bold") +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.45))) +
+  geom_text(aes(label=n), hjust=-0.2, size=4.5, fontface="bold") +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.3))) +
   labs(title = "Top 10 municipalities (frequency)", y = NULL, x = "Number of fires") +
-  estil_tfm_horizontal()
+  estil_tfm_gran()
 
-# P3 i P4 (Severitat)
 p3 <- ggplot(area_provincia, aes(y = reorder(provincia, total_area), x = total_area)) +
   geom_col(fill = blue_palette[3], width = 0.8) +
-  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
-  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.45))) +
+  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=4.5, fontface="bold") +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.3))) +
   labs(title = "Burnt area by province", y = NULL, x = "Total area (ha)") +
-  estil_tfm_horizontal()
+  estil_tfm_gran()
 
 p4 <- ggplot(top_10_muni_area, aes(y = reorder(municipio, total_area), x = total_area)) +
   geom_col(fill = blue_palette[4], width = 0.8) +
-  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=3, fontface="bold") +
-  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.45))) +
+  geom_text(aes(label=comma(round(total_area))), hjust=-0.2, size=4.5, fontface="bold") +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.3))) +
   labs(title = "Top 10 municipalities (burnt area)", y = NULL, x = "Total area (ha)") +
-  estil_tfm_horizontal()
+  estil_tfm_gran()
 
-# --- ASSEMBLEA AMB MÉS ESPAI ENTRE COLUMNES ---
-final_plot <- (p1 + p2) / (p3 + p4) + 
-  plot_layout(widths = c(1, 1)) + # Força columnes iguals
+# --- ENSAMBLATGE AMB PATCHWORK ---
+final_plot_gran <- (p1 + p2) / (p3 + p4) + 
   plot_annotation(
-    title = 'Spatial impact analysis: frequency vs. severity',
+    title = 'Spatial Impact Analysis: Frequency vs. Severity',
     subtitle = 'Historical distribution across Catalonia (1998-2022)',
     theme = theme(
-      plot.title = element_text(size = 14, hjust = 0.5, face = "bold", margin = margin(b = 10)),
-      plot.subtitle = element_text(size = 11, hjust = 0.5, color = "grey40", margin = margin(b = 20)),
-      plot.margin = margin(15, 15, 15, 15)
+      plot.title = element_text(size = 18, hjust = 0.5, face = "bold"),
+      plot.subtitle = element_text(size = 14, hjust = 0.5, color = "grey40", margin = margin(b = 20))
     )
   )
 
-
-print(final_plot)
+print(final_plot_gran)
 ```
 
 ### Key insights from the spatial analysis
@@ -548,7 +525,7 @@ The comparison between frequency and severity reveals a clear decoupling of fire
 
 The interaction between topography and wildfire dynamics in Catalonia reveals a distinct dual behavior when comparing fire frequency against fire severity.
 
-```{r warning=FALSE, message=FALSE}
+```{r warning=FALSE, message=FALSE, fig.width=16, fig.height=12, out.width="100%"}
 # 1. Frequency Plot (Improved aesthetics)
 p1 <- wfc_final2 %>%
   filter(!is.na(altitude_z)) %>%
@@ -560,9 +537,9 @@ p1 <- wfc_final2 %>%
     x = "Altitude (m)",
     y = "Number of fires"
   ) +
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 14) +
   theme(
-    plot.title = element_text(face = "bold", size = 14),
+    plot.title = element_text(face = "bold", size = 16),
     panel.grid.minor = element_blank(),
     axis.title = element_text(face = "italic")
   )
@@ -587,9 +564,9 @@ p2 <- wfc_final2 %>%
     x = "Altitude (m)",
     y = "Burnt area (ha)"
   ) +
-  theme_minimal(base_size = 12) +
+  theme_minimal(base_size = 14) +
   theme(
-    plot.title = element_text(face = "bold", size = 14),
+    plot.title = element_text(face = "bold", size = 16),
     panel.grid.minor = element_blank(),
     axis.title = element_text(face = "italic")
   )
@@ -599,7 +576,7 @@ p2 <- wfc_final2 %>%
 combined_plot <- p1 + p2 + 
   plot_annotation(
     title = "Topographic analysis of wildfire patterns in Catalonia (1998-2022)",
-    theme = theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+    theme = theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5))
   )
 
 # Display the result
@@ -648,11 +625,11 @@ The scatter plot and density analysis presented in the previous plot illustrate 
 
 -   **The zero-precipitation constraint**: A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density heatmap (indicated by the lighter yellow tones) confirms that the vast majority of fires occur under conditions of absolute lack of immediate rainfall. This points to a strong inverse correlation between moisture availability and fire occurrence, indicating that recent precipitation may act as a critical limiting factor for ignition and subsequent spread.
 
--   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 15°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges due to fuel volatility.
+-   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 15°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges.
 
 -   **Atmospheric "Dry windows"**: There are occasional ignitions at higher precipitation levels (up to 60-70 mm), but these remain isolated, small-scale events (dots with almost no radius). This suggests that even if an ignition occurs during a rainy period, the lack of fuel continuity or the high fuel moisture content prevents the fire from gaining significant size.
 
--   **Operational implications**: The "Meteorological Fingerprint" suggests that the risk is not linear but threshold-based. Once precipitation reaches 0 mm and temperature crosses the 30°C mark, the landscape enters a state of high receptivity where any anthropogenic ignition (as we will analyze in Chapter 5) has a high probability of becoming a high-impact event.
+-   **Operational implications**: The "Meteorological Fingerprint" suggests that the risk is not linear but threshold-based. Once precipitation reaches 0 mm and temperature crosses the 30°C mark, the landscape enters a state of high receptivity where any ignition has a high probability of becoming a high-impact event.
 
 ```{r warning=FALSE, message=FALSE}
 # Evolució de la TX mitjana per any
@@ -687,7 +664,7 @@ The historical evolution of the average maximum temperature (**TX**) during igni
 
 # Chapter 5: Land cover and ecosystem vulnerability
 
-```{r}
+```{r fig.width=16, fig.height=12, out.width="100%"}
 # 1. Preparació de dades 
 land_cover_summary <- wfc_final2 %>%
   group_by(land_cover_type) %>%
@@ -708,9 +685,9 @@ trunk_color <- "#606c38"
 estil_forestal_horiz <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    plot.title = element_text(face = "bold", size = 12, color = "#1b4332"),
-    axis.text.y = element_text(size = 9), 
-    axis.text.x = element_text(size = 8),
+    plot.title = element_text(face = "bold", size = 14, color = "#1b4332"),
+    axis.text.y = element_text(size = 11), 
+    axis.text.x = element_text(size = 10),
     panel.grid.major.y = element_blank(),
     panel.grid.minor = element_blank(),
     plot.margin = margin(5, 20, 5, 5) 
@@ -724,7 +701,7 @@ p5 <- ggplot(top_10_lc_freq, aes(y = reorder(land_cover_type, frequency), x = fr
   geom_segment(aes(yend = reorder(land_cover_type, frequency), xend = 0), 
                color = trunk_color, size = 1.2) +
   geom_point(size = 7, color = tree_color) +
-  geom_text(label = "🌲", size = 3, color = "white") +
+  geom_text(label = "🌲", size = 4, color = "white") +
   geom_text(aes(label = frequency), hjust = -0.6, size = 3.5, fontface = "bold", color = "#1b4332") +
   expand_limits(x = max(top_10_lc_freq$frequency) * 1.15) +
   labs(title = "Fire frequency by land cover type", y = NULL, x = "Number of fires") +
@@ -735,7 +712,7 @@ p6 <- ggplot(top_10_lc_area, aes(y = reorder(land_cover_type, total_area), x = t
   geom_segment(aes(yend = reorder(land_cover_type, total_area), xend = 0), 
                color = trunk_color, size = 1.2) +
   geom_point(size = 7, color = tree_color) +
-  geom_text(label = "🌳", size = 3, color = "white") +
+  geom_text(label = "🌳", size = 4, color = "white") +
   # Etiqueta amb format de milers
   geom_text(aes(label = comma(round(total_area))), hjust = -0.4, size = 3.5, fontface = "bold", color = "#1b4332") +
   scale_x_continuous(labels = comma) +
@@ -748,7 +725,7 @@ land_cover_tree_plot <- p5 / p6 +
   plot_annotation(
     title = "Ecosystem Impact: Land cover analysis",
     subtitle = "Vegetation and soil types visualized as forest density (1998-2022)",
-    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold", color = "#1b4332"))
+    theme = theme(plot.title = element_text(size = 18, hjust = 0.5, face = "bold", color = "#1b4332"))
   )
 
 print(land_cover_tree_plot)
@@ -768,7 +745,7 @@ The analysis of wildfire impact across different land cover types reveals a crit
 
 # Chapter 6: Analysis of ignition sources and drivers
 
-```{r}
+```{r fig.width=16, fig.height=12, out.width="100%"}
 # 1. Preparació de dades de causes (Top 15)
 causes_data <- wfc_final2 %>%
   group_by(causa) %>% 
@@ -789,9 +766,9 @@ cause_palette <- c("#feb24c", "#fd8d3c", "#f03b20", "#bd0026")
 estil_causes_tfm <- function() {
   theme_minimal(base_family = "sans") +
   theme(
-    plot.title = element_text(face = "bold", size = 12, color = "#800026"),
-    axis.text.y = element_text(size = 9), 
-    axis.text.x = element_text(size = 8),
+    plot.title = element_text(face = "bold", size = 16, color = "#800026"),
+    axis.text.y = element_text(size = 13), 
+    axis.text.x = element_text(size = 12),
     panel.grid.major.y = element_blank(),
     plot.margin = margin(5, 20, 5, 5)
   )
@@ -802,7 +779,7 @@ estil_causes_tfm <- function() {
 # P7: Top 15 Causes by Frequency
 p7 <- ggplot(top_15_causes_freq, aes(y = reorder(causa, frequency), x = frequency)) +
   geom_col(fill = cause_palette[2], width = 0.7) +
-  geom_text(aes(label = frequency), hjust = -0.2, size = 3, fontface = "bold") +
+  geom_text(aes(label = frequency), hjust = -0.2, size = 5, fontface = "bold") +
   expand_limits(x = max(top_15_causes_freq$frequency) * 1.2) +
   labs(title = "Top 10 fire causes by frequency", y = NULL, x = "Number of fires") +
   estil_causes_tfm()
@@ -810,7 +787,7 @@ p7 <- ggplot(top_15_causes_freq, aes(y = reorder(causa, frequency), x = frequenc
 # P8: Top 15 Causes by Burnt Area
 p8 <- ggplot(top_15_causes_area, aes(y = reorder(causa, total_area), x = total_area)) +
   geom_col(fill = cause_palette[4], width = 0.7) +
-  geom_text(aes(label = scales::comma(round(total_area))), hjust = -0.2, size = 3, fontface = "bold") +
+  geom_text(aes(label = scales::comma(round(total_area))), hjust = -0.2, size = 5, fontface = "bold") +
   scale_x_continuous(labels = scales::comma) +
   expand_limits(x = max(top_15_causes_area$total_area) * 1.25) +
   labs(title = "Top 10 fire causes by burnt area", y = NULL, x = "Total area (ha)") +
@@ -821,7 +798,7 @@ causes_plot_final <- p7 / p8 +
   plot_annotation(
     title = "Analysis of ignition sources",
     subtitle = "Top 10 most frequent and impactful causes (1998-2022)",
-    theme = theme(plot.title = element_text(size = 16, hjust = 0.5, face = "bold", color = "#800026"))
+    theme = theme(plot.title = element_text(size = 20, hjust = 0.5, face = "bold", color = "#800026"))
   )
 
 print(causes_plot_final)
@@ -841,7 +818,7 @@ The investigation into the origins of wildfires in Catalonia (1998-2022) reveals
 
 ### Behavioral drivers: A detailed analysis of arsonist motivations
 
-```{r}
+```{r fig.width=16, fig.height=12, out.width="100%"}
 # 1. Preparació de dades amb cerca parcial de text
 motivacions_data <- wfc_final2 %>%
   # Busquem qualsevol registre que contingui la paraula "Intencionado" sense importar majúscules
@@ -860,16 +837,31 @@ motivacions_data <- wfc_final2 %>%
 # 3. El gràfic
 ggplot(motivacions_data, aes(y = reorder(motivacion, frequency), x = frequency)) +
   geom_col(fill = "#800026", width = 0.7) + 
-  geom_text(aes(label = frequency), hjust = -0.2, size = 3.5, fontface = "bold", color = "#800026") +
+  # Augmentem la mida del número a la dreta de la barra (size = 5)
+  geom_text(aes(label = frequency), 
+            hjust = -0.2, 
+            size = 5, 
+            fontface = "bold", 
+            color = "#800026") +
   # Apliquem el salt de línia automàtic a l'eix Y
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 70)) +
-  expand_limits(x = max(motivacions_data$frequency) * 1.15) +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 50)) + 
+  # Ampliem l'espai a la dreta per evitar que el número quedi tallat
+  expand_limits(x = max(motivacions_data$frequency) * 1.25) +
   theme_minimal() +
   labs(
     title = "Analysis of arsonist motivations",
     subtitle = "Specific drivers within intentional fires",
     x = "Number of fires",
     y = NULL
+  ) +
+  # Ajustos globals de les mides del text del tema
+  theme(
+    plot.title = element_text(size = 18, face = "bold"),    # Títol principal
+    plot.subtitle = element_text(size = 14),               # Subtítol
+    axis.text.y = element_text(size = 12, color = "black"), # Etiquetes de l'eix Y (motivacions)
+    axis.text.x = element_text(size = 11),                 # Números de l'eix X
+    axis.title.x = element_text(size = 13, margin = margin(t = 10)), # Títol eix X
+    plot.margin = margin(10, 30, 10, 10)                   # Marge dret extra
   )
 ```
 
