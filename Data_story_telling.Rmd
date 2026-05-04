@@ -2,28 +2,30 @@
 title: "Unveiling wildfire patterns in Catalonia (1998-2022)"
 author: "Gemma Bargalló Solé"
 date: "`r Sys.Date()`"
-output: 
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    css: styles.css
   html_document:
-    toc: true
-    toc_float: true
-    theme: cosmo
+    df_print: paged
 references:
 - id: martinez2003
-  type: article-journal
+  type: "article-journal"
   author:
   - family: Martínez Navarro
     given: Ferran
-  - family: Simón-Soria
+  - family: "Simón-Soria"
     given: Fernando
-  - family: López-Abente
+  - family: "López-Abente"
     given: Gonzalo
   issued:
     year: 2004
-  title: "Valoración del impacto de la ola de calor del verano de 2003 sobre la mortalidad"
-  container-title: "Gaceta Sanitaria"
+  title: Valoración del impacto de la ola de calor del verano de 2003 sobre la mortalidad
+  container-title: Gaceta Sanitaria
   volume: 18
-  issue: "Supl. 1"
-  page: 250-258
+  issue: Supl. 1
+  page: "250-258"
   URL: "http://scielo.isciii.es/scielo.php?script=sci_arttext&pid=S0213-91112004000400040"
 ---
 
@@ -232,7 +234,7 @@ fire_table %>%
 
 ### Hourly ignitions and daily cycles
 
-```{r}
+```{r fig.height=7, fig.width=10}
 # 1. Preparació de les dades per hores
 hourly_counts <- wfc_final2 %>%
   filter(!is.na(hour_detected)) %>%
@@ -618,7 +620,7 @@ The right panel (**Fire severity by altitude**) provides a more complex perspect
 
 # Chapter 4: The meteorological dimension
 
-```{r warning=FALSE, message=FALSE}
+```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
 # Gràfic de densitat: On es concentren els incendis segons Clima?
 ggplot(wfc_final2, aes(x = tx, y = ppt)) +
   stat_density_2d(aes(fill = ..level..), geom = "polygon", color = "white") +
@@ -646,7 +648,7 @@ The scatter plot and density analysis presented in the previous plot illustrate 
 
 -   **Operational implications**: The "Meteorological Fingerprint" suggests that the risk is not linear but threshold-based. Once precipitation reaches 0 mm and temperature crosses the 30°C mark, the landscape enters a state of high receptivity where any ignition has a high probability of becoming a high-impact event.
 
-```{r warning=FALSE, message=FALSE}
+```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
 # Evolució de la TX mitjana per any
 climate_evolution <- wfc_final2 %>%
   group_by(year) %>%
@@ -1009,7 +1011,7 @@ predictions <- predict(rf_model, data = test_set)$predictions
 ```
 
 
-```{r}
+```{r fig.width=16, fig.height=7, fig.width=10}
 # Plot importance
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +

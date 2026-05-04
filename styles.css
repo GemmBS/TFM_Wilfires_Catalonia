@@ -1,0 +1,32 @@
+/* Fons general */
+body {
+  background-color: #fff5f0;
+}
+
+/* Header (barra superior) */
+.page-header {
+  background: linear-gradient(120deg, #8B0000, #FF4500);
+  color: white;
+}
+
+/* Títols del cos del document */
+h1, h2, h3, h4, h5 {
+  color: #000000 !important; /* Negre pur */
+  font-weight: bold;
+}
+
+/* Enllaços */
+a {
+  color: #cc3300;
+}
+
+/* Caixes de codi */
+pre {
+  background-color: #2b2b2b;
+  color: #f8f8f2;
+}
+
+/* Taules */
+table {
+  border: 1px solid #ddd;
+}
