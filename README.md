@@ -2,6 +2,7 @@
 This repository contains the complete analytical workflow, source code, and predictive modeling for the study of wildfire dynamics in Catalonia. The project integrates historical fire data with meteorological and topographic variables to understand spatial patterns and predict fire severity using Machine Learning.
 
 # 1. Repository structure
+```text
 .
 ├── Data/
 │   └── wfc_final2.csv            # Consolidated and cleaned dataset (1998-2022)
@@ -17,7 +18,7 @@ This repository contains the complete analytical workflow, source code, and pred
 ├── .gitignore                    # Specifies files to ignore in Git (e.g., heavy raw data)
 ├── LICENSE                       # Project license
 └── README.md                     # Main project documentation (This file)
-
+```
 # 2. Project summary: Wildfire Dynamics (1998-2022)
 ## Overview
 This project explores the spatio-temporal dynamics of wildfires in Catalonia through a comprehensive dataset covering 25 years of history. By integrating environmental drivers (topography, meteorology) and anthropogenic factors (ignition causes), the study provides a 360-degree view of the fire regime in the Mediterranean context.
