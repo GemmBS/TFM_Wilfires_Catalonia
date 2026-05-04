@@ -449,6 +449,21 @@ This interactive map bridges the gap between raw data and territorial management
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
 ```{r warning=FALSE, message=FALSE, fig.width=16, fig.height=12, out.width="100%"}
+# 1. Preparació de dades (Top 10)
+top_10_muni_freq <- wfc_final2 %>%
+count(municipio) %>%
+slice_max(n, n = 10)
+
+top_10_muni_area <- wfc_final2 %>%
+group_by(municipio) %>%
+summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE)) %>%
+slice_max(total_area, n = 10)
+
+area_provincia <- wfc_final2 %>%
+group_by(provincia) %>%summarise(total_area = sum(superficie_total_forestal, na.rm = TRUE))
+
+# Paleta de blaus
+blue_palette <- c("#08306b", "#08519c", "#2171b5", "#4292c6")
 # --- FUNCIÓ D'ESTIL PER A FORMAT GRAN ---
 estil_tfm_gran <- function() {
   theme_minimal(base_family = "sans") +
