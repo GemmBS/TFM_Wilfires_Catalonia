@@ -45,21 +45,21 @@ The technical framework of this thesis is built entirely within the R ecosystem,
   
 ### Core R Packages and Libraries
 - **Data wrangling & management**:
-    - tidyverse (including dplyr, tidyr, purrr): For efficient data manipulation and functional programming.
-    - nanoparquet & arrow: Used for high-performance reading and writing of large-scale datasets.
-    - janitor & here: For data cleaning and robust file path management.
+    - `tidyverse` (including `dplyr`, `tidyr`, `purrr`): For efficient data manipulation and functional programming.
+    - `nanoparquet` & `arrow`: Used for high-performance reading and writing of large-scale datasets.
+    - `janitor` & `here`: For data cleaning and robust file path management.
 - **Exploratory Data Analysis (EDA) & missing data**:
-    - DataExplorer, skimr, and naniar: For automated profiling and visualization of missingness patterns (VIM).
+    - `DataExplorer`, `skimr`, and `naniar`: For automated profiling and visualization of missingness patterns (VIM).
 - **Spatial data processing**:
-    - sf & terra: Essential for handling vector and raster geospatial data, enabling coordinate transformations and spatial joins.
+    - `sf` & `terra`: Essential for handling vector and raster geospatial data, enabling coordinate transformations and spatial joins.
 - **Machine Learning (Predictive Modeling)**:
-    - caret: The primary framework for model training, tuning, and 10-fold cross-validation.
-    - ranger: A fast implementation of Random Forest optimized for high-dimensional data.
-    - pROC: For evaluating model performance through Area Under the Curve (AUC-ROC) analysis.
+    - `caret`: The primary framework for model training, tuning, and 10-fold cross-validation.
+    - `ranger`: A fast implementation of Random Forest optimized for high-dimensional data.
+    - `pROC`: For evaluating model performance through Area Under the Curve (AUC-ROC) analysis.
 - **Advanced visualization & interactive Storytelling**:
-    - Static: ggplot2 for high-quality publication graphics, with patchwork and gridExtra for multi-panel compositions.
-    - Interactive: leaflet for dynamic mapping, plotly for interactive charts, and crosstalk for shared data filtering without a backend server.
-    - UI/UX: gt for professional table formatting, and bslib / bsicons for modern dashboard aesthetics.
+    - Static: `ggplot2` for high-quality publication graphics, with `patchwork` and `gridExtra` for multi-panel compositions.
+    - Interactive: `leaflet` for dynamic mapping, plotly`` for interactive charts, and `crosstalk` for shared data filtering without a backend server.
+    - UI/UX: `gt` for professional table formatting, and `bslib` / `bsicons` for modern dashboard aesthetics.
 ## Significance
 This study transforms 25 years of raw forest fire records into actionable insights for fire management and prevention. It highlights the "thermal hardening" of the territory due to climate change and provides a baseline for predicting which ignitions have the highest probability of becoming catastrophic events.
 
