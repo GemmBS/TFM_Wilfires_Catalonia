@@ -88,7 +88,9 @@ Wildfires are one of the most significant environmental threats in Catalonia. As
 -   **Bridge descriptive and predictive analysis**: To provide a visual foundation that justifies the variables used in our Random Forest predictive model.
 
 "*Data is the first step toward effective prevention. By visualizing the past 25 years, we can better prepare for the next season.*"
-```{r}
+
+```{r warning=FALSE, message=FALSE}
+options(bslib.precompiled = FALSE)
 total_fires <- nrow(wfc_final2)
 total_area <- sum(wfc_final2$superficie_total_forestal, na.rm = TRUE)
 
@@ -108,7 +110,6 @@ layout_column_wrap(
   )
 )
 ```
-
 
 # Chapter 1: The pulse of time (temporal analysis)
 
@@ -446,7 +447,6 @@ This interactive map bridges the gap between raw data and territorial management
 -   **Thermal intensity**: The color of the markers represents the maximum temperature ($TX$) recorded on the day of the ignition. A shift towards darker red tones indicates more extreme thermal conditions.
 
 -   **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
-
 
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
@@ -1010,7 +1010,6 @@ predictions <- predict(rf_model, data = test_set)$predictions
 #postResample(pred = predictions, obs = test_set$log_surface)
 ```
 
-
 ```{r fig.width=16, fig.height=7, fig.width=10}
 # Plot importance
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
@@ -1020,7 +1019,6 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   labs(title = "Variable importance in wildfire surface prediction",
        x = "Predictors", y = "Importance (Permutation)")
 ```
-
 
 ## Model setup and performance metrics
 
@@ -1106,7 +1104,6 @@ The arithmetic mean (6.67 ha) was selected as the classification threshold. This
 # 2. Seleccionar només les 10 més importants
 #plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
 ```
-
 
 ```{r}
 # 1. Creem el dataframe amb les dades de la teva Confusion Matrix
