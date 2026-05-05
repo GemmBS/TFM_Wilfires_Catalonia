@@ -1322,3 +1322,9 @@ importancia_data <- varImp(rf_final_model, scale = FALSE)
 
 
 plot(importancia_data, top = 15, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
+
+
+
+
+
+
