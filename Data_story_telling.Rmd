@@ -1195,6 +1195,4 @@ This study successfully demonstrates that machine learning, specifically the Ran
 
 2.  **Geographic priority**: The high importance of coordinates and altitude justifies the transition towards **spatialized forest management**. Resources should be strategically pre-positioned based on these identified geographic risk corridors rather than relying on uniform seasonal trends.
 
-3.  **Threshold significance**: Moving away from arbitrary thresholds to a data-driven mean of **6.67 ha** proved essential for model stability. This threshold effectively isolates the **top 3.6% of fires**, which are responsible for the majority of the ecological and structural damage in Catalonia.
-
 # References
