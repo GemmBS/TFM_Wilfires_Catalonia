@@ -19,15 +19,15 @@ This repository contains the complete analytical workflow, source code, and pred
 ├── LICENSE                       # Project license
 └── README.md                     # Main project documentation (This file)
 ```
-# 2. Project summary: Wildfire Dynamics (1998-2022)
+# 2. Project summary: Wildfire dynamics (1998-2022)
 ## Overview
 This project explores the spatio-temporal dynamics of wildfires in Catalonia through a comprehensive dataset covering 25 years of history. By integrating environmental drivers (topography, meteorology) and anthropogenic factors (ignition causes), the study provides a 360-degree view of the fire regime in the Mediterranean context.
 
 ## Research focus & analysis
 The analysis is structured around the transition from descriptive statistics to predictive intelligence:
-- **Spatial & Topographic patterns**: Identifying the "Frequency-Severity Paradox" where high-frequency areas (Urban-Wildland Interface) often differ from high-severity hotspots (Rural interior).
-- **Meteorological Fingerprint**: Defining critical thresholds (The "Danger Zone") of 0 mm precipitation and temperatures above 30°C that escalate routine ignitions into Large Wildfires.
-- **Human Factor**: Analyzing the dominance of anthropogenic ignitions (intentionality and negligence) as the primary driver of fire risk in the region.
+- **Spatial & topographic patterns**: Identifying the "Frequency-Severity Paradox" where high-frequency areas (Urban-Wildland Interface) often differ from high-severity hotspots (Rural interior).
+- **Meteorological fingerprint**: Defining critical thresholds (The "Danger Zone") of 0 mm precipitation and temperatures above 30°C that escalate routine ignitions into Large Wildfires.
+- **Human dfactor**: Analyzing the dominance of anthropogenic ignitions (intentionality and negligence) as the primary driver of fire risk in the region.
 
 ## Technological approach
 To address the complexity of wildfire behavior, the project leverages:
@@ -36,14 +36,14 @@ To address the complexity of wildfire behavior, the project leverages:
   - **Regression**: To predict the potential burnt area based on environmental constraints.
   - **Classification**: To isolate and identify the characteristics of high-severity fire events (top 3.6% of fires).
 
-## Tools & Technologies   
+## Tools & technologies   
 The technical framework of this thesis is built entirely within the R ecosystem, leveraging its advanced capabilities for spatial data analysis, statistical modeling, and interactive storytelling:
 
 - **Programming language**: R (version 4.x)
 - **Integrated Development Environment (IDE)**: RStudio & Posit
 - **Documentation & reporting**: RMarkdown for creating a reproducible and "semantically transparent" workflow.
   
-### Core R Packages and Libraries
+### Core R packages and libraries
 - **Data wrangling & management**:
     - `tidyverse` (including `dplyr`, `tidyr`, `purrr`): For efficient data manipulation and functional programming.
     - `nanoparquet` & `arrow`: Used for high-performance reading and writing of large-scale datasets.
