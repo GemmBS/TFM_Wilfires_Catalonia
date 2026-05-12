@@ -588,10 +588,26 @@ wfc_num_long <- wfc_final2 %>%
 ggplot(wfc_num_long, aes(x = value)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.6) +
   geom_density(color = "firebrick", size = 1) +
-  facet_wrap(~variable, scales = "free") +
+  # Aquí fixem el número de columnes a 3
+  facet_wrap(~variable, scales = "free", ncol = 3) + 
   theme_minimal() +
+  theme(
+    # Noms de les variables més grans i llegibles
+    strip.text = element_text(size = 15, face = "bold"), 
+    
+    # Ajustos de títols i etiquetes
+    plot.title = element_text(size = 20, face = "bold"),
+    plot.subtitle = element_text(size = 16),
+    axis.title = element_text(size = 14),
+    
+    # Espaiat entre gràfics perquè no quedin atapeïts
+    panel.spacing = unit(1.2, "lines"),
+    
+    # Opcional: gira les etiquetes de l'eix X si els números es trepitgen
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
   labs(
-    title = "Distribution analysis: Histograms and Density",
+    title = "Distribution analysis: Histograms and density",
     subtitle = "Numerical variables from the wildfire dataset",
     x = "Value", 
     y = "Density"
