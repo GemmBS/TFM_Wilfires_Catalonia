@@ -76,7 +76,7 @@ wfc_model_final <- wfc_final2 %>%
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,
+    month_detected, hour_detected, year,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -139,41 +139,59 @@ par(mfrow=c(1,1))
 We split the data into an 80% Training set and a 20% Test set.
 
 ```{r}
-# Set seed for reproducibility
-set.seed(123)
+# Define the cutoff point
+cutoff <- 2017
 
-# Create the partition based on the target variable
-train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
+# Create the sets chronologically
+train_set <- wfc_model_final[wfc_model_final$year <= cutoff, ]
+test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 
-# Generate sets
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
+# Check dimensions
+message("Training set (1998-2017): ", nrow(train_set))
+message("Testing set (2018-2022): ", nrow(test_set))
 
-# Print final dimensions
-message("Training set rows: ", nrow(train_set))
-message("Testing set rows: ", nrow(test_set))
 ```
 
 
 ## 2.3 Random Forest Model: Regression Approach to Burnt Area Prediction
 
 ```{r}
-# Install and load ranger if you haven't
+# Load necessary libraries
+library(blockCV)
+library(sf)
 library(ranger)
+library(dplyr)
 
-# Train the Random Forest model
-# We predict 'log_surface' using all other columns in 'train_set'
+# --- 2. Spatial Cross-Validation Setup ---
+# Convert the training set to a spatial object (SF)
+# Replace "lon" and "lat" with your actual coordinate column names
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
+
+# Create spatial blocks to prevent the model from "memorizing" locations
+# This ensures validation happens on areas the model hasn't seen
+spatial_folds <- cv_spatial(
+  x = train_sf,
+  column = "log_surface", 
+  k = 5,                  # 5-fold spatial CV
+  size = 20000,           # 20km blocks
+  selection = "random",
+  seed = 123
+)
+
+# --- 3. Random Forest Model (Regression) ---
+# We use the chronological train_set
+# We exclude the original surface and the 'year' column to focus on environmental drivers
 rf_model <- ranger(
   formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  data            = train_set %>% select(-superficie_total_forestal, -year),
   num.trees       = 500,
-  importance      = "permutation", # Important to analyze variable impact later
+  importance      = "permutation", 
   seed            = 123
 )
 
-# Print model summary
 print(rf_model)
 ```
+
 
 ```{r}
 # Get importance
@@ -226,52 +244,94 @@ The resulting distribution provides a total of 525 cases for the high severity c
 
 
 ```{r}
-# Creem la classe binària (Severity)
+# ==========================================
+# RANDOM FOREST CLASSIFICATION WITH SPATIAL-TEMPORAL SPLIT
+# ==========================================
+
+# 1. Required Libraries
+library(caret)
+library(blockCV)
+library(sf)
+library(ranger)
+library(pROC)
+library(dplyr)
+
+# 2. Data Preparation & Chronological Split
+# ------------------------------------------
+# Define the binary target variable (Severity)
 wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
 
-# 1. Separació inicial (Hold-out)
-set.seed(123)
-train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
-```
+# Time-based split: 1998-2017 (Train) and 2018-2022 (Test)
+cutoff <- 2017
+train_set <- wfc_model_final %>% filter(year <= cutoff)
+test_set  <- wfc_model_final %>% filter(year > cutoff)
 
+message("Training set (1998-2017): ", nrow(train_set), " rows")
+message("Testing set (2018-2022): ", nrow(test_set), " rows")
 
-```{r}
-# 1. Afegim 'sampling = "down"' al trainControl
+# 3. Spatial Cross-Validation Setup (blockCV)
+# ------------------------------------------
+# Convert training set to a spatial object (SF)
+# Make sure "longitude" and "latitude" match your column names
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
+
+# Generate 20km spatial blocks
+spatial_folds <- cv_spatial(
+  x = train_sf,
+  column = "severity",
+  k = 5,
+  size = 20000, 
+  selection = "random",
+  seed = 123
+)
+
+# IMPORTANT FIX: Convert blockCV indices to a clean list of integers for caret
+# We extract the training indices for each fold
+cv_index <- lapply(spatial_folds$folds_list, function(x) as.integer(x$train))
+
+# 4. Model Training Configuration
+# ------------------------------------------
 fitControl <- trainControl(
   method = "cv",
-  number = 10,
+  index = cv_index,        # Uses our custom spatial blocks
   classProbs = TRUE,
   summaryFunction = twoClassSummary,
   savePredictions = "final",
-  sampling = "down" 
+  sampling = "down"        # Addresses class imbalance
 )
 
+# 5. Training the Random Forest (Ranger)
+# ------------------------------------------
+set.seed(123)
 rf_final_model <- train(
-  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
+             land_cover_id + latitude + longitude + month_detected + 
+             hour_detected + afecto_zonas_interfaz_urbano_forestal,
   data = train_set,
   method = "ranger",
   trControl = fitControl,
-  metric = "ROC", # El model triarà els millors paràmetres basant-se en l'AUC
+  metric = "ROC", 
   importance = "permutation"
 )
-```
 
-```{r}
-# Prediccions sobre el test_set (dades mai vistes)
+# 6. Evaluation on Independent Test Set (2018-2022)
+# ------------------------------------------
+# Predictions (Class and Probabilities)
 final_preds <- predict(rf_final_model, newdata = test_set)
 final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
 
-# 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
-conf_matrix <- confusionMatrix(final_preds, test_set$severity)
-print(conf_matrix)
+# Confusion Matrix for Kappa and Accuracy
+print(confusionMatrix(final_preds, test_set$severity))
 
-# 2. AUC-ROC (per a la teva "discriminative power" del punt 2.6.4)
+# AUC-ROC for Discriminative Power
 roc_obj <- roc(test_set$severity, final_probs$High)
-auc_value <- auc(roc_obj)
-print(paste("AUC final del model:", auc_value))
+print(paste("Final Spatial-Temporal AUC:", round(auc(roc_obj), 4)))
+
+# 7. Variable Importance Plot
+# ------------------------------------------
+plot(varImp(rf_final_model), main = "Variable Importance (Spatial-Temporal RF)")
 ```
+
 
 
 ```{r}
