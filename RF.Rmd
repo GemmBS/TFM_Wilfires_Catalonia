@@ -29,17 +29,18 @@ library(tidyr)
 library(dplyr)
 library(gridExtra)
 library(leaflet)
-library(dplyr)
 library(crosstalk)
 library(shiny)
 library(shinydashboard)  
 library(plotly)
-library(dplyr)
 library(tidyr)
 library(corrplot)
 library(caret)
 library(ranger)
 library(pROC)
+library(blockCV)
+library(sf)
+
 ```
 
 
@@ -258,6 +259,7 @@ postResample(pred = predictions, obs = test_set$log_surface)
 
 Before proceeding with the classification modeling, it is essential to define a threshold that allows us to categorize the fires into two classes: High Severity and Low Severity. Instead of choosing an arbitrary value, we conduct an exploratory analysis of the distribution of the burnt forest area to ensure the statistical robustness of the model.
 
+
 ```{r}
 summary(wfc_model_final$superficie_total_forestal)
 ```
@@ -271,104 +273,103 @@ table(wfc_final2$superficie_total_forestal > 6.67)
 ```
 The resulting distribution provides a total of 525 cases for the high severity class and 13,872 for the low severity class. This selection allows the model to focus on the 3.6% of the fires with the greatest impact, while also ensuring a sufficiently representative sample of the minority class for the Random Forest algorithm to effectively learn the predictive patterns.
 
+Let's try with another quantile: 
+
+```{r}
+llindar_80 <- quantile(wfc_model_final$superficie_total_forestal, 0.80)
+message("El percentil 80 correspon a: ", round(llindar_80, 3), " ha")
+```
+The threshold for 'High Severity' was adjusted from the arithmetic mean to the 80th percentile of the historical distribution. This change is justified by the high skewness of wildfire data and aligns with the INFOCAT plan's criteria, which defines high-risk areas starting at the 0.80 percentile. This approach ensures the model focuses on the top 20% of most impactful events while improving class balance for the Random Forest algorithm."
+
+
+```{r}
+# Comprovar quants incendis superen el threshold
+table(wfc_final2$superficie_total_forestal > 0.53)
+```
+The classification model now focuses on predicting the top 20% of the most severe wildfires (n = 2,878).
+
 
 ```{r}
 # ==========================================
-# RANDOM FOREST CLASSIFICATION WITH SPATIAL-TEMPORAL SPLIT
+# RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
 # ==========================================
 
-# 1. Required Libraries
-library(caret)
-library(blockCV)
-library(sf)
-library(ranger)
-library(pROC)
-library(dplyr)
-
-# 2. Data Preparation & Chronological Split
+# 1. Preparació de les dades i Split Temporal
 # ------------------------------------------
-# Define the binary target variable (Severity)
-wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 0.53, "High", "Low"))
 
-# Time-based split: 1998-2017 (Train) and 2018-2022 (Test)
-cutoff <- 2017
-train_set <- wfc_model_final %>% filter(year <= cutoff)
-test_set  <- wfc_model_final %>% filter(year > cutoff)
+train_set <- wfc_model_final %>% filter(year <= 2017)
+test_set  <- wfc_model_final %>% filter(year > 2017)
 
-message("Training set (1998-2017): ", nrow(train_set), " rows")
-message("Testing set (2018-2022): ", nrow(test_set), " rows")
-
-# 3. Spatial Cross-Validation Setup (blockCV)
-# ------------------------------------------
-# Convert training set to a spatial object (SF)
-# Make sure "longitude" and "latitude" match your column names
-train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
-
-# Generate 20km spatial blocks
-spatial_folds <- cv_spatial(
-  x = train_sf,
-  column = "severity",
-  k = 5,
-  size = 20000, 
-  selection = "random",
-  seed = 123
-)
-
-# IMPORTANT FIX: Convert blockCV indices to a clean list of integers for caret
-# We extract the training indices for each fold
-cv_index <- lapply(spatial_folds$folds_list, function(x) as.integer(x$train))
-
-# 4. Model Training Configuration
-# ------------------------------------------
-fitControl <- trainControl(
-  method = "cv",
-  index = cv_index,        # Uses our custom spatial blocks
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary,
-  savePredictions = "final",
-  sampling = "down"        # Addresses class imbalance
-)
-
-# 5. Training the Random Forest (Ranger)
-# ------------------------------------------
+# 2. Downsampling manual del Train Set (Equilibrem 50/50)
+# ------------------------------------------------------
 set.seed(123)
-rf_final_model <- train(
-  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
-             land_cover_id + latitude + longitude + month_detected + 
-             hour_detected + afecto_zonas_interfaz_urbano_forestal,
-  data = train_set,
-  method = "ranger",
-  trControl = fitControl,
-  metric = "ROC", 
-  importance = "permutation"
+high_sev_train <- train_set %>% filter(severity == "High")
+low_sev_train  <- train_set %>% filter(severity == "Low")
+
+# Igualem el nombre d'incendis petits al de grans
+low_sev_balanced <- low_sev_train %>% sample_n(nrow(high_sev_train))
+train_balanced <- bind_rows(high_sev_train, low_sev_balanced)
+
+# 3. Entrenament directe amb Ranger (Més ràpid i sense errors)
+# ------------------------------------------------------------
+set.seed(123)
+rf_final_model <- ranger(
+  formula         = severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
+                    land_cover_id + latitude + longitude + month_detected + 
+                    hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data            = train_balanced,
+  num.trees       = 500,
+  mtry            = 3,            # Valor estàndard (arrel quadrada de predictors)
+  importance      = "permutation",
+  probability     = TRUE,         # Necessari per a l'AUC
+  seed            = 123
 )
 
-# 6. Evaluation on Independent Test Set (2018-2022)
-# ------------------------------------------
-# Predictions (Class and Probabilities)
-final_preds <- predict(rf_final_model, newdata = test_set)
-final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+# 4. Prediccions sobre el Test Set (2018-2022)
+# --------------------------------------------
+# Obtenim probabilitats i classes
+probs_test <- predict(rf_final_model, data = test_set)$predictions
+preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
+preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-# Confusion Matrix for Kappa and Accuracy
-print(confusionMatrix(final_preds, test_set$severity))
+# 5. Mètriques de Qualitat (El que posaràs al TFM)
+# -----------------------------------------------
+library(caret)
+conf_matrix <- confusionMatrix(preds_test, test_set$severity)
+print(conf_matrix)
 
-# AUC-ROC for Discriminative Power
-roc_obj <- roc(test_set$severity, final_probs$High)
-print(paste("Final Spatial-Temporal AUC:", round(auc(roc_obj), 4)))
+library(pROC)
+roc_obj <- roc(test_set$severity, probs_test[, "High"])
+message("AUC Final (Temporal Validation 2018-2022): ", round(auc(roc_obj), 4))
 
-# 7. Variable Importance Plot
-# ------------------------------------------
-plot(varImp(rf_final_model), main = "Variable Importance (Spatial-Temporal RF)")
 ```
 
 
-
 ```{r}
-# 1. Extraure la importància
-importancia_data <- varImp(rf_final_model, scale = FALSE)
+# 1. Extraure la importància i convertir-la en un dataframe net
+importancia_df <- data.frame(
+  Variable = names(rf_class_model$variable.importance),
+  Importance = rf_class_model$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb les 15 millors
 
-# 2. Seleccionar només les, per exemple, 10 més importants
-# Això farà que el gràfic sigui molt més net i entenedor
-plot(importancia_data, top = 15, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
+# 2. Fer el gràfic amb ggplot2 (que queda molt més professional per al TFM)
+
+ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "#d95f02") + # El color taronja que t'agrada
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 15 Drivers of Wildfire Severity",
+    subtitle = "Classification Model (Threshold: 0.53 ha)",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10)
+  )
 ```
 
