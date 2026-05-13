@@ -172,8 +172,8 @@ train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
 spatial_folds <- cv_spatial(
   x = train_sf,
   column = "log_surface", 
-  k = 5,                  # 5-fold spatial CV
-  size = 20000,           # 20km blocks
+  k = 10,                  # 10-fold spatial CV
+  size = 15000,           # 15km blocks
   selection = "random",
   seed = 123
 )
@@ -211,6 +211,35 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
        x = "Predictors", y = "Importance (Permutation)")
 ```
 
+
+
+```{r}
+# 1. Realitzar prediccions sobre el test_set
+predictions <- predict(rf_model, data = test_set %>% select(-superficie_total_forestal, -year))
+
+# 2. Calcular mètriques d'error (RMSE i R-squared real)
+actual_values <- test_set$log_surface
+predicted_values <- predictions$predictions
+
+# Mètriques
+rmse_test <- sqrt(mean((actual_values - predicted_values)^2))
+r2_test <- cor(actual_values, predicted_values)^2
+
+message("RMSE on Test Set (2018-2022): ", round(rmse_test, 4))
+message("R-squared on Test Set (2018-2022): ", round(r2_test, 4))
+
+# 3. Gràfica de dispersió: Predicció vs Realitat
+df_eval <- data.frame(Actual = actual_values, Predicted = predicted_values)
+
+ggplot(df_eval, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.3, color = "darkorange") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "Actual vs Predicted Surface (Log Scale)",
+       subtitle = "Independent Test Set (2018-2022)",
+       x = "Real log(Surface)",
+       y = "Predicted log(Surface)")
+```
 
 ```{r}
 # Predict on test set
