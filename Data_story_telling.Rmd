@@ -939,53 +939,67 @@ wfc_model_final <- wfc_model_final %>%
 # Define the cutoff point
 cutoff <- 2017
 
-# Load necessary libraries
-library(blockCV)
-library(sf)
-library(ranger)
-library(dplyr)
+# Create the sets chronologically
+train_set <- wfc_model_final[wfc_model_final$year <= cutoff, ]
+test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 
-# --- 2. Spatial Cross-Validation Setup ---
-# Convert the training set to a spatial object (SF)
-# Replace "lon" and "lat" with your actual coordinate column names
-train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
+# Check dimensions
+# message("Training set (1998-2017): ", nrow(train_set))
+# message("Testing set (2018-2022): ", nrow(test_set))
 
-# Create spatial blocks to prevent the model from "memorizing" locations
-# This ensures validation happens on areas the model hasn't seen
+
+set.seed(123)
 spatial_folds <- cv_spatial(
   x = train_sf,
   column = "log_surface", 
-  k = 10,                  # 10-fold spatial CV
-  size = 15000,           # 15km blocks
-  selection = "random",
-  seed = 123
+  k = 10,                # 10 folds com deies
+  size = 15000,          # Blocs de 15km
+  selection = "random"
 )
 
-# --- 3. Random Forest Model (Regression) ---
-# We use the chronological train_set
-# We exclude the original surface and the 'year' column to focus on environmental drivers
-rf_model <- ranger(
-  formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal, -year),
-  num.trees       = 500,
-  importance      = "permutation", 
-  seed            = 123
+# Extraiem els índexs per a caret
+folds_index <- lapply(spatial_folds$folds_list, function(x) as.integer(x[[1]]))
+
+## Train model 
+# --- 3. Configuració de Caret amb índexs espacials ---
+fitControl_reg <- trainControl(
+  method = "cv",
+  index = folds_index,     
+  savePredictions = "final"
 )
 
-# Get importance
-importance_values <- importance(rf_model)
-importance_df <- data.frame(
-  Variable = names(importance_values),
-  Importance = importance_values
-) %>% arrange(desc(Importance))
+# --- 4. Entrenament amb Ranger ---
+set.seed(123)
+rf_reg_cv <- train(
+  log_surface ~ .,
+  data = train_set %>% select(-superficie_total_forestal, -year),
+  method = "ranger",
+  trControl = fitControl_reg,
+  tuneGrid = expand.grid(
+    mtry = 3, 
+    splitrule = "variance", 
+    min.node.size = 5
+  ),
+  importance = "permutation"
+)
 
+print(rf_reg_cv)
+
+## Test Set 2018-2022
+# --- 5. Predicció sobre el Test Set ---
+reg_preds <- predict(rf_reg_cv, newdata = test_set)
+
+# --- 6. Mètriques finals per a la teva taula gt ---
+reg_metrics <- postResample(pred = reg_preds, obs = test_set$log_surface)
+print(reg_metrics)
 
 # 1. Creem el dataframe amb les dades de la teva regressió
+# 1. Creem el dataframe amb les dades REALS de la teva Spatial CV i Test
 regression_metrics <- tibble(
-  Metric = c("R-squared (OOB)", "R-squared (Test)", "RMSE (Test)", "MAE (Test)"),
-  Value = c(0.163, 0.091, 0.669, 0.409),
+  Metric = c("R-squared (Spatial CV)", "R-squared (Test)", "RMSE (Test)", "MAE (Test)"),
+  Value = c(0.108, 0.108, 0.656, 0.372), # Valors actualitzats segons el teu últim print
   Interpretation = c(
-    "Internal variance explained (Out-of-Bag estimate)",
+    "Internal variance explained (10-fold Spatial CV)",
     "Proportion of variance explained in the test set (2018-2022)",
     "Root Mean Square Error (average error in log-scale)",
     "Mean Absolute Error (average deviation in log-scale)"
@@ -1020,22 +1034,35 @@ gt_regression_results <- regression_metrics %>%
 
 # Visualització
 gt_regression_results
-
-# Predict on test set
-predictions <- predict(rf_model, data = test_set)$predictions
-
-# Calculate Performance Metrics (RMSE and R2)
-#postResample(pred = predictions, obs = test_set$log_surface)
 ```
 
 ```{r fig.width=16, fig.height=7, fig.width=10}
-# Plot importance
+# 1. Extraure la importància i filtrar les 15 millors
+importance_df <- data.frame(
+  Variable = names(rf_reg_cv$finalModel$variable.importance),
+  Importance = rf_reg_cv$finalModel$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb el Top 15
+
+# 2. Gràfic amb ggplot2
+library(ggplot2)
+
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.7) +
   coord_flip() +
   theme_minimal() +
-  labs(title = "Variable Importance in Wildfire Surface Prediction",
-       x = "Predictors", y = "Importance (Permutation)")
+  labs(
+    title = "Top 15 Variable Importance: Wildfire Surface Prediction",
+    subtitle = "Regression Model | 10-fold Spatial Cross-Validation",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10),
+    panel.grid.minor = element_blank()
+  )
 ```
 
 ## Model setup and performance metrics

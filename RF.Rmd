@@ -170,7 +170,7 @@ spatial_folds <- cv_spatial(
 )
 
 # Extraiem els índexs per a caret
-folds_index <- spatial_folds$folds_list
+folds_index <- lapply(spatial_folds$folds_list, function(x) as.integer(x[[1]]))
 ```
 
 ## Train model 
@@ -179,7 +179,7 @@ folds_index <- spatial_folds$folds_list
 # --- 3. Configuració de Caret amb índexs espacials ---
 fitControl_reg <- trainControl(
   method = "cv",
-  index = folds_index,     # IMPORTANT: Això aplica els blocs de 15km
+  index = folds_index,     
   savePredictions = "final"
 )
 
@@ -203,28 +203,31 @@ print(rf_reg_cv)
 
 
 ```{r}
-# 1. Extraure la importància del model de caret (rf_reg_cv)
-# Caret guarda la importància dins de 'finalModel'
-importance_values <- rf_reg_cv$finalModel$variable.importance
-
-# 2. Crear el dataframe net
+# 1. Extraure la importància i filtrar les 15 millors
 importance_df <- data.frame(
-  Variable = names(importance_values),
-  Importance = importance_values
-) %>% arrange(desc(Importance))
+  Variable = names(rf_reg_cv$finalModel$variable.importance),
+  Importance = rf_reg_cv$finalModel$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb el Top 15
 
-# 3. Gràfic (mantenint el teu estil però amb els noms correctes)
+# 2. Gràfic amb ggplot2
 library(ggplot2)
 
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.7) +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Variable Importance in Wildfire Surface Prediction",
-    subtitle = "Regression Model (10-fold Spatial CV)",
-    x = "Predictors", 
+    title = "Top 15 Variable Importance: Wildfire Surface Prediction",
+    subtitle = "Regression Model | 10-fold Spatial Cross-Validation",
+    x = NULL, 
     y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10),
+    panel.grid.minor = element_blank()
   )
 ```
 
