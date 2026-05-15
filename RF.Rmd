@@ -151,103 +151,94 @@ test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 message("Training set (1998-2017): ", nrow(train_set))
 message("Testing set (2018-2022): ", nrow(test_set))
 
+
+# --- 2. Creació de Blocs Espacials (Spatial CV) ---
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
 ```
 
 
 ## 2.3 Random Forest Model: Regression Approach to Burnt Area Prediction
 
 ```{r}
-# Load necessary libraries
-library(blockCV)
-library(sf)
-library(ranger)
-library(dplyr)
-
-# --- 2. Spatial Cross-Validation Setup ---
-# Convert the training set to a spatial object (SF)
-# Replace "lon" and "lat" with your actual coordinate column names
-train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
-
-# Create spatial blocks to prevent the model from "memorizing" locations
-# This ensures validation happens on areas the model hasn't seen
+set.seed(123)
 spatial_folds <- cv_spatial(
   x = train_sf,
   column = "log_surface", 
-  k = 10,                  # 10-fold spatial CV
-  size = 15000,           # 15km blocks
-  selection = "random",
-  seed = 123
+  k = 10,                # 10 folds com deies
+  size = 15000,          # Blocs de 15km
+  selection = "random"
 )
 
-# --- 3. Random Forest Model (Regression) ---
-# We use the chronological train_set
-# We exclude the original surface and the 'year' column to focus on environmental drivers
-rf_model <- ranger(
-  formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal, -year),
-  num.trees       = 500,
-  importance      = "permutation", 
-  seed            = 123
+# Extraiem els índexs per a caret
+folds_index <- spatial_folds$folds_list
+```
+
+## Train model 
+
+```{r}
+# --- 3. Configuració de Caret amb índexs espacials ---
+fitControl_reg <- trainControl(
+  method = "cv",
+  index = folds_index,     # IMPORTANT: Això aplica els blocs de 15km
+  savePredictions = "final"
 )
 
-print(rf_model)
+# --- 4. Entrenament amb Ranger ---
+set.seed(123)
+rf_reg_cv <- train(
+  log_surface ~ .,
+  data = train_set %>% select(-superficie_total_forestal, -year),
+  method = "ranger",
+  trControl = fitControl_reg,
+  tuneGrid = expand.grid(
+    mtry = 3, 
+    splitrule = "variance", 
+    min.node.size = 5
+  ),
+  importance = "permutation"
+)
+
+print(rf_reg_cv)
 ```
 
 
+
+
 ```{r}
-# Get importance
-importance_values <- importance(rf_model)
+# 1. Extraure la importància del model de caret (rf_reg_cv)
+# Caret guarda la importància dins de 'finalModel'
+importance_values <- rf_reg_cv$finalModel$variable.importance
+
+# 2. Crear el dataframe net
 importance_df <- data.frame(
   Variable = names(importance_values),
   Importance = importance_values
 ) %>% arrange(desc(Importance))
 
-# Plot importance
+# 3. Gràfic (mantenint el teu estil però amb els noms correctes)
 library(ggplot2)
+
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   coord_flip() +
   theme_minimal() +
-  labs(title = "Variable Importance in Wildfire Surface Prediction",
-       x = "Predictors", y = "Importance (Permutation)")
+  labs(
+    title = "Variable Importance in Wildfire Surface Prediction",
+    subtitle = "Regression Model (10-fold Spatial CV)",
+    x = "Predictors", 
+    y = "Importance (Permutation)"
+  )
 ```
 
-
-
-```{r}
-# 1. Realitzar prediccions sobre el test_set
-predictions <- predict(rf_model, data = test_set %>% select(-superficie_total_forestal, -year))
-
-# 2. Calcular mètriques d'error (RMSE i R-squared real)
-actual_values <- test_set$log_surface
-predicted_values <- predictions$predictions
-
-# Mètriques
-rmse_test <- sqrt(mean((actual_values - predicted_values)^2))
-r2_test <- cor(actual_values, predicted_values)^2
-
-message("RMSE on Test Set (2018-2022): ", round(rmse_test, 4))
-message("R-squared on Test Set (2018-2022): ", round(r2_test, 4))
-
-# 3. Gràfica de dispersió: Predicció vs Realitat
-df_eval <- data.frame(Actual = actual_values, Predicted = predicted_values)
-
-ggplot(df_eval, aes(x = Actual, y = Predicted)) +
-  geom_point(alpha = 0.3, color = "darkorange") +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
-  theme_minimal() +
-  labs(title = "Actual vs Predicted Surface (Log Scale)",
-       subtitle = "Independent Test Set (2018-2022)",
-       x = "Real log(Surface)",
-       y = "Predicted log(Surface)")
-```
+## Test Set 2018-2022
 
 ```{r}
-# Predict on test set
-predictions <- predict(rf_model, data = test_set)$predictions
+# --- 5. Predicció sobre el Test Set ---
+reg_preds <- predict(rf_reg_cv, newdata = test_set)
 
-# Calculate Performance Metrics (RMSE and R2)
-postResample(pred = predictions, obs = test_set$log_surface)
+# --- 6. Mètriques finals per a la teva taula gt ---
+reg_metrics <- postResample(pred = reg_preds, obs = test_set$log_surface)
+print(reg_metrics)
 ```
 
 
@@ -335,7 +326,7 @@ probs_test <- predict(rf_final_model, data = test_set)$predictions
 preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
 preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-# 5. Mètriques de Qualitat (El que posaràs al TFM)
+# 5. Mètriques de Qualitat 
 # -----------------------------------------------
 library(caret)
 conf_matrix <- confusionMatrix(preds_test, test_set$severity)
@@ -373,5 +364,10 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
     plot.title = element_text(face = "bold", size = 14),
     axis.text = element_text(size = 10)
   )
+```
+
+```{r}
+library(knitr)
+purl("RF.Rmd")
 ```
 
