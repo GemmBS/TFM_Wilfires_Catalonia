@@ -1062,6 +1062,9 @@ plots_cat <- lapply(categorical_vars, function(var) {
 walk(plots_cat, print)
 
 
+# RANDOM FOREST
+
+## ----------------------------------------------------------------------------------------------------------------------------------------
 library(tidyverse)
 library(nanoparquet)
 library(here)
@@ -1078,33 +1081,27 @@ library(tidyr)
 library(dplyr)
 library(gridExtra)
 library(leaflet)
-library(dplyr)
 library(crosstalk)
 library(shiny)
 library(shinydashboard)  
 library(plotly)
-library(dplyr)
 library(tidyr)
 library(corrplot)
 library(caret)
 library(ranger)
 library(pROC)
+library(blockCV)
+library(sf)
 
 
 
-# 1. Data Import
-
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Final dataset import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
 
-# 2. Quantitative Analysis of Fire Severity: A Random Forest Regression Approach to Burnt Area Prediction.
-## 2.1 Pre-processing and Feature Engineering
-### 2.1.1 Data Cleaning and Feature Selection
-In this step, we filter the columns, handle categorical variables as factors, and prepare the dataset for the model.
 
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Load required libraries
 library(dplyr)
 library(tidyr)
@@ -1125,7 +1122,7 @@ wfc_model_final <- wfc_final2 %>%
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,
+    month_detected, hour_detected, year,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -1143,12 +1140,7 @@ wfc_model_final <- wfc_final2 %>%
   drop_na()
 
 
-
-### 2.1.2 Correlation Analysis
-
-We use Spearman correlation because your previous histograms showed that the numerical variables are not normally distributed.
-
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Select only numerical columns for the matrix
 numeric_vars <- wfc_model_final %>% select(where(is.numeric))
 cor_matrix <- cor(numeric_vars, method = "spearman")
@@ -1165,12 +1157,7 @@ corrplot(cor_matrix,
 cor_matrix
 
 
-
-### 2.1.3 Target Variable Transformation
-
-Since the burnt surface is highly skewed (most fires are small, few are huge), we apply a Logarithmic transformation to stabilize the variance.
-
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Apply Log1p transformation (log(x + 1)) to handle 0 values
 wfc_model_final <- wfc_model_final %>%
   mutate(log_surface = log1p(superficie_total_forestal))
@@ -1182,49 +1169,58 @@ hist(wfc_model_final$log_surface, main="Log-transformed Surface", col="lightblue
 par(mfrow=c(1,1))
 
 
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# Define the cutoff point
+cutoff <- 2017
 
-### 2.1.4 Data Splitting (Training and Testing)
+# Create the sets chronologically
+train_set <- wfc_model_final[wfc_model_final$year <= cutoff, ]
+test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 
-We split the data into an 80% Training set and a 20% Test set.
-
-
-# Set seed for reproducibility
-set.seed(123)
-
-# Create the partition based on the target variable
-train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
-
-# Generate sets
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
-
-# Print final dimensions
-message("Training set rows: ", nrow(train_set))
-message("Testing set rows: ", nrow(test_set))
+# Check dimensions
+message("Training set (1998-2017): ", nrow(train_set))
+message("Testing set (2018-2022): ", nrow(test_set))
 
 
 
-## 2.3 Random Forest Model: Regression Approach to Burnt Area Prediction
-
-
-# Install and load ranger if you haven't
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# Load necessary libraries
+library(blockCV)
+library(sf)
 library(ranger)
+library(dplyr)
 
-# Train the Random Forest model
-# We predict 'log_surface' using all other columns in 'train_set'
+# --- 2. Spatial Cross-Validation Setup ---
+# Convert the training set to a spatial object (SF)
+# Replace "lon" and "lat" with your actual coordinate column names
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
+
+# Create spatial blocks to prevent the model from "memorizing" locations
+# This ensures validation happens on areas the model hasn't seen
+spatial_folds <- cv_spatial(
+  x = train_sf,
+  column = "log_surface", 
+  k = 10,                  # 10-fold spatial CV
+  size = 15000,           # 15km blocks
+  selection = "random",
+  seed = 123
+)
+
+# --- 3. Random Forest Model (Regression) ---
+# We use the chronological train_set
+# We exclude the original surface and the 'year' column to focus on environmental drivers
 rf_model <- ranger(
   formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  data            = train_set %>% select(-superficie_total_forestal, -year),
   num.trees       = 500,
-  importance      = "permutation", # Important to analyze variable impact later
+  importance      = "permutation", 
   seed            = 123
 )
 
-# Print model summary
 print(rf_model)
 
 
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Get importance
 importance_values <- importance(rf_model)
 importance_df <- data.frame(
@@ -1242,86 +1238,144 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
        x = "Predictors", y = "Importance (Permutation)")
 
 
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# 1. Realitzar prediccions sobre el test_set
+predictions <- predict(rf_model, data = test_set %>% select(-superficie_total_forestal, -year))
+
+# 2. Calcular mètriques d'error (RMSE i R-squared real)
+actual_values <- test_set$log_surface
+predicted_values <- predictions$predictions
+
+# Mètriques
+rmse_test <- sqrt(mean((actual_values - predicted_values)^2))
+r2_test <- cor(actual_values, predicted_values)^2
+
+message("RMSE on Test Set (2018-2022): ", round(rmse_test, 4))
+message("R-squared on Test Set (2018-2022): ", round(r2_test, 4))
+
+# 3. Gràfica de dispersió: Predicció vs Realitat
+df_eval <- data.frame(Actual = actual_values, Predicted = predicted_values)
+
+ggplot(df_eval, aes(x = Actual, y = Predicted)) +
+  geom_point(alpha = 0.3, color = "darkorange") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(title = "Actual vs Predicted Surface (Log Scale)",
+       subtitle = "Independent Test Set (2018-2022)",
+       x = "Real log(Surface)",
+       y = "Predicted log(Surface)")
 
 
+## ----------------------------------------------------------------------------------------------------------------------------------------
 # Predict on test set
 predictions <- predict(rf_model, data = test_set)$predictions
 
 # Calculate Performance Metrics (RMSE and R2)
 postResample(pred = predictions, obs = test_set$log_surface)
-```
 
 
-# 3. Predictive Modeling of Fire Susceptibility: A Binary Classification Framework via Ensemble Learning.
-## 3.1 Pre-processing and Feature Engineering
-### 3.1.4 Data Splitting (Training and Testing)
-
-- **Threshold definition for severity classification**
-  
-  Before proceeding with the classification modeling, it is essential to define a threshold that allows us to categorize the fires into two classes: High Severity and Low Severity. Instead of choosing an arbitrary value, we conduct an exploratory analysis of the distribution of the burnt forest area to ensure the statistical robustness of the model.
-
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
 summary(wfc_model_final$superficie_total_forestal)
 
-The analysis of the variable total_forest_area reveals a distribution with an extremely high positive skew (right-skewed). While the median is only 0.07 ha, the mean rises to 6.67 ha due to the influence of a few large-scale fires (up to a maximum of 9,301 ha).
 
-This disparity indicates that 75% of the fires (3rd quartile = 0.37 ha) are, in fact, small outbreaks. Therefore, using the arithmetic mean as a cutoff point allows us to identify those events that deviate significantly from the central behavior and represent the real danger for forest management.
-
-
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# Comprovar quants incendis superen la mitjana
 table(wfc_final2$superficie_total_forestal > 6.67)
-```
-The resulting distribution provides a total of 525 cases for the high severity class and 13,872 for the low severity class. This selection allows the model to focus on the 3.6% of the fires with the greatest impact, while also ensuring a sufficiently representative sample of the minority class for the Random Forest algorithm to effectively learn the predictive patterns.
 
 
-wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+## ----------------------------------------------------------------------------------------------------------------------------------------
+llindar_80 <- quantile(wfc_model_final$superficie_total_forestal, 0.80)
+message("El percentil 80 correspon a: ", round(llindar_80, 3), " ha")
 
+
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# Comprovar quants incendis superen el threshold
+table(wfc_final2$superficie_total_forestal > 0.53)
+
+
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
+
+# 1. Preparació de les dades i Split Temporal
+# ------------------------------------------
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 0.53, "High", "Low"))
+
+train_set <- wfc_model_final %>% filter(year <= 2017)
+test_set  <- wfc_model_final %>% filter(year > 2017)
+
+# 2. Downsampling manual del Train Set (Equilibrem 50/50)
+# ------------------------------------------------------
 set.seed(123)
-train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
+high_sev_train <- train_set %>% filter(severity == "High")
+low_sev_train  <- train_set %>% filter(severity == "Low")
+
+# Igualem el nombre d'incendis petits al de grans
+low_sev_balanced <- low_sev_train %>% sample_n(nrow(high_sev_train))
+train_balanced <- bind_rows(high_sev_train, low_sev_balanced)
 
 
 
+## ----------------------------------------------------------------------------------------------------------------------------------------
 
-# 1. Afegim 'sampling = "down"' al trainControl
-fitControl <- trainControl(
-  method = "cv",
-  number = 10,
-  classProbs = TRUE,
-  summaryFunction = twoClassSummary,
-  savePredictions = "final",
-  sampling = "down" 
+# 3. Entrenament directe amb Ranger (Més ràpid i sense errors)
+# ------------------------------------------------------------
+set.seed(123)
+rf_final_model <- ranger(
+  formula         = severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
+    land_cover_id + latitude + longitude + month_detected + 
+    hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data            = train_balanced,
+  num.trees       = 500,
+  mtry            = 3,            
+  importance      = "permutation",
+  probability     = TRUE,         
+  seed            = 123
 )
 
-rf_final_model <- train(
-  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + afecto_zonas_interfaz_urbano_forestal,
-  data = train_set,
-  method = "ranger",
-  trControl = fitControl,
-  metric = "ROC", 
-  importance = "permutation"
-)
+# 4. Prediccions sobre el Test Set (2018-2022)
+# --------------------------------------------
+# Obtenim probabilitats i classes
+probs_test <- predict(rf_final_model, data = test_set)$predictions
+preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
+preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-
-
-
-final_preds <- predict(rf_final_model, newdata = test_set)
-final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
-
-
-conf_matrix <- confusionMatrix(final_preds, test_set$severity)
+# 5. Mètriques de Qualitat (El que posaràs al TFM)
+# -----------------------------------------------
+library(caret)
+conf_matrix <- confusionMatrix(preds_test, test_set$severity)
 print(conf_matrix)
 
-roc_obj <- roc(test_set$severity, final_probs$High)
-auc_value <- auc(roc_obj)
-print(paste("AUC final del model:", auc_value))
+library(pROC)
+roc_obj <- roc(test_set$severity, probs_test[, "High"])
+message("AUC Final (Temporal Validation 2018-2022): ", round(auc(roc_obj), 4))
 
 
+## ----------------------------------------------------------------------------------------------------------------------------------------
+# 1. Extraure la importància i convertir-la en un dataframe net
+importancia_df <- data.frame(
+  Variable = names(rf_final_model$variable.importance),
+  Importance = rf_final_model$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb les 15 millors
 
-importancia_data <- varImp(rf_final_model, scale = FALSE)
+# 2. Fer el gràfic amb ggplot2 (que queda molt més professional per al TFM)
 
+ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "#d95f02") + # El color taronja que t'agrada
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 15 Drivers of Wildfire Severity",
+    subtitle = "Classification Model (Threshold: 0.53 ha)",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10)
+  )
 
-plot(importancia_data, top = 15, main = "Top 10 Drivers of Wildfire Severity", col = "#d95f02")
 
 
 
