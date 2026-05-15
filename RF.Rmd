@@ -202,8 +202,6 @@ print(rf_reg_cv)
 ```
 
 
-
-
 ```{r}
 # 1. Extraure la importància del model de caret (rf_reg_cv)
 # Caret guarda la importància dins de 'finalModel'
