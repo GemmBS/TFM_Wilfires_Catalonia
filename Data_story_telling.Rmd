@@ -986,7 +986,7 @@ To refine the prevention strategies against intentional fires, it is essential t
 
 -   **Atypical drivers**: The data also captures marginal but significant behaviors, such as **"[464] Venganzas"** (Revenge) and, interestingly, **"[471] Incendios para distraer a la policía"**. These indicators highlight that wildfires are occasionally used as instruments of social conflict or as tactical diversions for other criminal activities.
 
-# Chapter 7: Predictive Modeling using Random Forest
+# Chapter 7: Predictive modeling using Random Forest
 
 ## Regresion Random Forest
 
