@@ -1075,74 +1075,83 @@ To define the boundary between "Low" and "High" severity classes, the distributi
 The arithmetic mean (6.67 ha) was selected as the classification threshold. This decision is statistically justified as it isolates the top 3.6% of events (525 fires), which represent the fires that deviate significantly from the central tendency and account for the vast majority of the total burnt area in Catalonia.
 
 ```{r}
-# Creem la classe binària (Severity)
-#wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+# RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
 
-# 1. Separació inicial (Hold-out)
-#set.seed(123)
-#train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
-#train_set <- wfc_model_final[train_index, ]
-#test_set  <- wfc_model_final[-train_index, ]
+# 1. Preparació de les dades i Split Temporal
+# ------------------------------------------
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 0.53, "High", "Low"))
 
-# 1. Afegim 'sampling = "down"' al trainControl
-#fitControl <- trainControl(
-#  method = "cv",
-#  number = 10,
-#  classProbs = TRUE,
-#  summaryFunction = twoClassSummary,
-#  savePredictions = "final",
-#  sampling = "down" 
-#)
+train_set <- wfc_model_final %>% filter(year <= 2017)
+test_set  <- wfc_model_final %>% filter(year > 2017)
 
-#rf_final_model <- train(
-#  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + #afecto_zonas_interfaz_urbano_forestal,
-#  data = train_set,
-#  method = "ranger",
-#  trControl = fitControl,
-#  metric = "ROC", 
-#  importance = "permutation"
-#)
+# 2. Downsampling manual del Train Set (Equilibrem 50/50)
+# ------------------------------------------------------
+set.seed(123)
+high_sev_train <- train_set %>% filter(severity == "High")
+low_sev_train  <- train_set %>% filter(severity == "Low")
 
-# Prediccions sobre el test_set
-#final_preds <- predict(rf_final_model, newdata = test_set)
-#final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+# Igualem el nombre d'incendis petits al de grans
+low_sev_balanced <- low_sev_train %>% sample_n(nrow(high_sev_train))
+train_balanced <- bind_rows(high_sev_train, low_sev_balanced)
 
-# 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
-#conf_matrix <- confusionMatrix(final_preds, test_set$severity)
-#print(conf_matrix)
+# 3. Entrenament directe amb Ranger (Més ràpid i sense errors)
+# ------------------------------------------------------------
+set.seed(123)
+rf_final_model <- ranger(
+  formula         = severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
+                    land_cover_id + latitude + longitude + month_detected + 
+                    hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data            = train_balanced,
+  num.trees       = 500,
+  mtry            = 3,            
+  importance      = "permutation",
+  probability     = TRUE,         
+  seed            = 123
+)
 
-# 2. AUC-ROC 
-#roc_obj <- roc(test_set$severity, final_probs$High)
-#auc_value <- auc(roc_obj)
-#print(paste("AUC final del model:", auc_value))
+# 4. Prediccions sobre el Test Set (2018-2022)
+# --------------------------------------------
+# Obtenim probabilitats i classes
+probs_test <- predict(rf_final_model, data = test_set)$predictions
+preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
+preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-# 1. Extraure la importància
-#importancia_data <- varImp(rf_final_model, scale = FALSE)
+# 5. Mètriques de Qualitat (El que posaràs al TFM)
+# -----------------------------------------------
+library(caret)
+conf_matrix <- confusionMatrix(preds_test, test_set$severity)
 
-# 2. Seleccionar només les 10 més importants
-#plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
+library(pROC)
+#roc_obj <- roc(test_set$severity, probs_test[, "High"])
+#message("AUC Final (Temporal Validation 2018-2022): ", round(auc(roc_obj), 4))
+
 ```
 
 ```{r}
-# 1. Creem el dataframe amb les dades de la teva Confusion Matrix
+# 1. Creem el dataframe amb les dades de la teva Confusion Matrix REALS
 classification_metrics <- tibble(
   Metric = c("AUC (Area Under Curve)", "Sensitivity (Recall)", "Specificity", 
              "Balanced Accuracy", "Accuracy", "Kappa"),
-  Value = c(0.7459, 0.6731, 0.6847, 0.6789, 0.6842, 0.0735),
-  Interpretation = c("Excellent discriminative capacity", "Ability to detect High Severity fires", 
-                    "Ability to detect Low Severity fires", "Average of sensitivity and specificity", 
-                    "Overall correct predictions", "Agreement above chance")
+  Value = c(0.7145, 0.6260, 0.6893, 0.6576, 0.6789, 0.2122),
+  Interpretation = c(
+    "Good discriminative capacity", 
+    "Ability to detect High Severity fires", 
+    "Ability to detect Low Severity fires", 
+    "Average of sensitivity and specificity", 
+    "Overall correct predictions", 
+    "Fair agreement above chance"
+  )
 )
 
 # 2. Generem la taula gt
 gt_model_results <- classification_metrics %>%
   gt() %>%
   tab_header(
-    title = "Random Forest classification performance",
-    subtitle = "Evaluation of high severity fire prediction (> 6.67 ha)"
+    title = "Random Forest Classification Performance",
+    subtitle = "Prediction of High Severity Fires (> 0.53 ha)"
   ) %>%
   cols_label(
-    Metric = "Performance metric",
+    Metric = "Performance Metric",
     Value = "Value",
     Interpretation = "Analysis"
   ) %>%
@@ -1156,19 +1165,39 @@ gt_model_results <- classification_metrics %>%
   ) %>%
   tab_options(
     table.font.names = "Times New Roman",
-    heading.title.font.size = px(20)
+    heading.title.font.size = px(20),
+    column_labels.font.weight = "bold"
   )
 
 # Visualització
 gt_model_results
 ```
 
-```{r, echo=FALSE, out.width="100%", fig.align="center", fig.cap="Classification Model Performance: Confusion Matrix and Statistics"}
-# Carreguem la llibreria per gestionar imatges
-library(knitr)
+```{r fig.width=16, fig.height=7, fig.width=10}
+# 1. Extraure la importància i convertir-la en un dataframe net
+importancia_df <- data.frame(
+  Variable = names(rf_final_model$variable.importance),
+  Importance = rf_final_model$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb les 15 millors
 
-# Inserim la imatge des de la subcarpeta images
-include_graphics("images/ClasRF.PNG")
+# 2. Fer el gràfic amb ggplot2 (que queda molt més professional per al TFM)
+
+ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "#d95f02") + # El color taronja que t'agrada
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 15 Drivers of Wildfire Severity",
+    subtitle = "Classification Model (Threshold: 0.53 ha)",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10)
+  )
 ```
 
 ## Model setup and performance metrics
