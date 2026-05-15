@@ -588,23 +588,25 @@ wfc_num_long <- wfc_final2 %>%
 ggplot(wfc_num_long, aes(x = value)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "steelblue", alpha = 0.6) +
   geom_density(color = "firebrick", size = 1) +
-  # Aquí fixem el número de columnes a 3
+  # Fixem el número de columnes a 3
   facet_wrap(~variable, scales = "free", ncol = 3) + 
   theme_minimal() +
   theme(
-    # Noms de les variables més grans i llegibles
+    # Noms de les variables (títols de cada subgràfic)
     strip.text = element_text(size = 15, face = "bold"), 
     
-    # Ajustos de títols i etiquetes
+    # Ajustos de títols i etiquetes generals
     plot.title = element_text(size = 20, face = "bold"),
     plot.subtitle = element_text(size = 16),
     axis.title = element_text(size = 14),
     
-    # Espaiat entre gràfics perquè no quedin atapeïts
-    panel.spacing = unit(1.2, "lines"),
+    # --- MODIFICACIÓ: Números dels eixos ---
+    axis.text.x = element_text(size = 12, face = "bold", angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    # ---------------------------------------
     
-    # Opcional: gira les etiquetes de l'eix X si els números es trepitgen
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    # Espaiat entre gràfics
+    panel.spacing = unit(1.2, "lines")
   ) +
   labs(
     title = "Distribution analysis: Histograms and density",
