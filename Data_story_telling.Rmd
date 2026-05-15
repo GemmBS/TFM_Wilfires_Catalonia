@@ -448,6 +448,100 @@ This interactive map bridges the gap between raw data and territorial management
 
 -   **Magnitude vs. temperature**: Generally, higher maximum temperatures correlate with larger burnt areas due to increased fuel aridity. However, this is not a universal rule; for instance, the La Jonquera fire in July 2012 reached 8,729.8 ha with a $TX$ of only 28.6°C, demonstrating that other factors can override temperature as the primary driver.
 
+### Case studies: deep dive into critical wildfire years
+
+In this section, we examine specific years that defined the contemporary fire regime in Catalonia. These snapshots from the interactive map illustrate the convergence of extreme weather (represented by color intensity) and high fuel loads (represented by circle size).
+
+#### Year 1998: the central Catalonia disaster
+
+The year 1998 marks a turning point in Catalan wildfire history, characterized by massive high-intensity events driven by extreme thermal stress.
+
+![](images/1998.PNG){width="384"}
+
+**Key highlights:**
+
+-   **Aguilar de Segarra (July 18th)**: This was the largest event of the period, burning **9,301.01 ha**. The fire was triggered by power lines during a window of high temperatures (**34.15ºC**) and primarily affected herbaceous crops before escalating into forest masses.
+
+-   **Cardona**: Occurring simultaneously and reaching **36.7ºC**, this fire affected dense deciduous broadleaf forests. Although officially recorded as intentional, its behavior was heavily conditioned by the heatwave and its proximity to the Aguilar de Segarra focus.
+
+-   **Southern fronts**: Other significant ignitions occurred in **Benifallet** (433.4 ha) and **Ulldecona** (403.5 ha), both linked to infrastructure failures (power lines).
+
+-   **Spatial pattern**: While large "megafires" dominated the interior, a high frequency of smaller ignitions persisted along the coastal line and specific points in the Pyrenees, reflecting the dual nature of Catalonia's fire pressure.
+
+#### Year 1999: Data gap in historical records
+
+No wildfire records are available for the year 1999 in the current consolidated dataset.
+
+#### Year 2000: Extreme events and seasonal shifts
+
+Although the total number of records in 2000 did not reach the levels of the 1998 season, several significant events stood out due to their scale and timing. The year was characterized by a high concentration of events along the coastal regions and two major fires that marked the annual statistics.
+
+![](images/2000.PNG){width="384"}
+
+**Key highlights:**
+
+-   **La Garriguella (August):** The most significant event of the year occurred in August in the Alt Empordà region. This fire lasted three days, burning a total of **5,905.25 ha**. The affected area consisted mainly of *Dense sclerophyllous and laurel forests*. The official cause was recorded as intentional.
+
+-   **L'Albiol (March):** An unusual large-scale fire took place in March, outside the traditional summer peak. It burned for four days, affecting **634.4 ha**. The ignition was caused by power lines.
+
+### Year 2003: Heatwaves and coastal pressure
+
+The 2003 season was characterized by extreme thermal stress, as evidenced by the intense red coloration across the interactive map, indicating very high maximum temperatures during ignition days. A defining spatial pattern of this year was that **nearly all wildfires were concentrated along the coastal region**, with the majority of events occurring between late July and August, coinciding with one of the most severe heatwaves recorded in the region.
+
+![](images/2003.PNG){width="384"}
+
+-   **Sant Llorenç de Savall (August):** This was the most devastating fire of the year, burning **2,952 ha**. The ignition occurred under a maximum temperature of **34.9ºC**, which facilitated rapid spread across the dense forest masses of the Pre-Coastal Range.
+
+-   **Gallifa (August):** Another critical event took place in Gallifa, where temperatures reached an extreme peak of **37ºC**. This fire affected **1,263 ha**, further illustrating the direct correlation between extreme heat episodes and the escalation of fire severity.
+
+#### Year 2005: High frequency and central Catalonia clusters
+
+The 2005 season was characterized by a very high frequency of fire events, particularly during the summer months, with affected areas of varying extensions across the territory. The interactive map reveals a significant concentration of fires in the central region of Catalonia, where several large-scale events occurred in close spatial and temporal proximity.
+
+![](images/2005.PNG){width="404"}
+
+-   **Cardona (July):** A major fire took place in Cardona, burning **1,276 ha** over two days. The ignition was attributed to a smoker, highlighting the impact of individual negligence in high-risk forest areas.
+
+-   **Castellnou de Bages (July):** Only eight days after the Cardona event, a nearby fire in Castellnou de Bages burned **849 ha**. In this case, the official cause was recorded as intentional.
+
+-   **Talamanca (June):** One month prior to the Bages cluster, a significant fire occurred in Talamanca, affecting **760 ha**. The origin was linked to beekeeping activities, further illustrating the variety of anthropogenic triggers that can lead to large-scale wildfires in the Mediterranean mosaic.
+
+Following 2005, a general downward trend is observed where wildfires gradually decrease in both frequency and intensity until the next major peak in 2012.
+
+#### Year 2012: Large forest fires and Pyrenean anomalies
+
+The 2012 season stands out as one of the most critical in the historical series, marked by the return of Large Forest Fires (LFF) and significant out-of-season activity in high-altitude regions.
+
+![](images/2012.PNG){width="404"}
+
+-   **La Jonquera (July):** This was the most devastating event of the year and one of the largest in Catalonia's recent history. Burning **8,728 ha** over nine days, the fire was triggered by a cigarette butt (smokers). The rapid spread was driven by the combination of extreme fuel dryness and the characteristic *Tramuntana* wind of the Alt Empordà region.
+
+-   **Rasquera (May):** Two months prior to the Jonquera crisis, a major fire occurred in Rasquera, burning **2,735 ha** over five days. The official cause was recorded as intentional, highlighting the high impact of human-driven ignitions even before the peak of the summer season.
+
+-   **Winter Pyrenean Fires (March):** A notable feature of 2012 was the occurrence of three significant wildfires in the Pyrenees of Lleida during March---a period and location not typically associated with large fires. These events affected **El Pont de Suert** (11.4°C), **Baix Pallars** (14.2°C), and **Valls de Valira** (14.8°C). Despite the relatively low maximum temperatures, these fires proved that fuel availability and local conditions can sustain significant burning outside of heatwave windows.
+
+-   **Overall Severity:** Beyond these landmark cases, the 2012 map reveals several other ignitions exceeding **100 ha**, confirming a year of high environmental vulnerability across diverse geographic zones.
+
+Following the critical events of 2012, the historical series shows a period of relative stabilization, with wildfire intensity and frequency gradually decreasing once again until the next shift in the trend observed in 2019.
+
+#### Year 2019: The Ebro basin crisis
+
+The 2019 season is largely defined by a single catastrophic event in the Ebro basin, while the rest of the year maintained a relatively low-intensity profile across the territory.
+
+![](images/2019.PNG){width="399"}
+
+-   **La Torre de l'Espanyol (June):** This major wildfire was the most significant event of the year, burning **4,281 ha** over nearly ten days. The ignition was caused by the improper management of farm waste (burning garbage), which, combined with extreme heat and low humidity, led to one of the most difficult suppression efforts of the decade.
+
+#### Year 2022: Lightning
+
+To conclude the historical series, the year 2022 stands out as a new peak of severity, marked by extreme weather conditions and two major events that illustrate very different origins:
+
+![](images/2022.PNG){width="404"}
+
+-   **Artesa de Segre (June):** This wildfire burned **2,504 ha** and is particularly significant due to its natural origin, as it was caused by **lightning**. This event highlights how, within a context of accumulated drought, natural factors can trigger large-scale fires that are increasingly difficult to manage.
+
+-   **Pont de Vilomara i Rocafort (July):** One month later, a second major fire occurred, affecting **1,422 ha**. In contrast to the previous event, the cause was recorded as **intentional**.
+
 In addition to the interactive map, we have generated these bar charts to summarize the provinces and municipalities with the highest fire frequency and the most significant burnt area. This dual perspective allows us to distinguish between areas of high human or natural activity (frequency) and areas of high ecological vulnerability (burnt area).
 
 ```{r warning=FALSE, message=FALSE, fig.width=16, fig.height=12, out.width="100%"}
@@ -915,7 +1009,7 @@ wfc_model_final <- wfc_final2 %>%
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,
+    month_detected, hour_detected, year,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -946,6 +1040,10 @@ test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 # Check dimensions
 # message("Training set (1998-2017): ", nrow(train_set))
 # message("Testing set (2018-2022): ", nrow(test_set))
+
+
+# --- 2. Creació de Blocs Espacials (Spatial CV) ---
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
 
 
 set.seed(123)
@@ -983,15 +1081,14 @@ rf_reg_cv <- train(
   importance = "permutation"
 )
 
-print(rf_reg_cv)
 
 ## Test Set 2018-2022
-# --- 5. Predicció sobre el Test Set ---
-reg_preds <- predict(rf_reg_cv, newdata = test_set)
-
-# --- 6. Mètriques finals per a la teva taula gt ---
-reg_metrics <- postResample(pred = reg_preds, obs = test_set$log_surface)
-print(reg_metrics)
+# # --- 5. Predicció sobre el Test Set ---
+# reg_preds <- predict(rf_reg_cv, newdata = test_set)
+# 
+# # --- 6. Mètriques finals per a la teva taula gt ---
+# reg_metrics <- postResample(pred = reg_preds, obs = test_set$log_surface)
+# print(reg_metrics)
 
 # 1. Creem el dataframe amb les dades de la teva regressió
 # 1. Creem el dataframe amb les dades REALS de la teva Spatial CV i Test
@@ -1053,7 +1150,7 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Top 15 Variable Importance: Wildfire Surface Prediction",
+    title = "Variable importance in wildfire surface prediction",
     subtitle = "Regression Model | 10-fold Spatial Cross-Validation",
     x = NULL, 
     y = "Importance (Permutation)"
@@ -1071,25 +1168,23 @@ To quantify the drivers of fire severity, a **Random Forest** regression model w
 
 The model evaluation on the test set yielded the following metrics:
 
--   **RMSE**: 0.694
+-   **RMSE**: 0.656
 
--   **R-squared (**$R^2$): 0.146
+-   **R-squared (**$R^2$): 0.108
 
--   **MAE**: 0.377
+-   **MAE**: 0.372
 
-While an $R^2$ of **14,6%** might appear low in other disciplines, in wildfire science, it reflects the inherent complexity and "noise" of fire behavior. Predicting the final size of a fire at the moment of ignition is a major challenge, as it depends on dynamic factors not fully captured in static datasets, such as suppression efficiency, wind shifts, and fuel connectivity.
+While an $R^2$ of **10,8%** might appear modest, it is consistent with wildfire modeling literature. Predicting the final extent of a fire at the moment of ignition is a major challenge; it depends on stochastic factors such as suppression efforts, immediate wind shifts, and fuel continuity that are not fully captured in static historical datasets. However, the high consistency between our **Spatial Cross-Validation** and the test results confirms that the model has high generalizability.
 
 ## Drivers of severity: variable importance analysis
 
 The primary value of the model lies in its **Permutation Importance**, which identifies which factors most significantly influence the final burnt area:
 
--   **Geospatial predominance**: **Longitude** and **Latitude** are the top predictors. This suggests a strong spatial component in Catalonia, where specific geographic corridors are more prone to large-scale events due to persistent wind patterns or topographical funnels.
+-   **Geospatial and Topographical predominance**: **Longitude**, **latitude**, and **altitude** emerge as the top predictors. This confirms a strong regional pattern in Catalonia, where specific geographic corridors and elevations are more prone to large-scale events due to fuel availability and topographical funnels.
 
--   **The "WUI" and territorial context**: The high importance of **`afecto_zonas_interfaz_urbano_forestal`** (WUI) confirms that the proximity to human settlements are critical. Fires near urban interfaces are often more complex to manage, as resources must be split between forest suppression and structural protection.
+-   **Meteorological drivers**: Maximum temperature (**tx**) and **thermal amplitude** are critical. Higher thermal stress lowers the fuel's ignition threshold and accelerates fire spread, making these variables decisive in determining fire magnitude.
 
--   **Topography and climate**: **`altitude_z`** and **`tx`** (Maximum Temperature) appear as key environmental drivers. Higher temperatures lower the fuel's ignition threshold, while altitude influences both vegetation type and accessibility for ground crews.
-
--   **Anthropogenic drivers**: The variable **`causa`** ranks significantly high, reinforcing the idea that intentionality or specific types of negligence (as seen in Chapter 6) are not just frequency issues but indicators of potentially more severe fires.
+-   **Anthropogenic and land cover context**: The importance of **machinery** as a cause and the detection hour (**hour_detected**) highlights that the context of the ignition is vital. Fires starting during peak solar radiation windows or due to specific human activities (like harvesting) are more likely to escalate.
 
 ## Classification Random Forest
 
@@ -1099,7 +1194,7 @@ While regression provides a continuous estimate of fire size, from a forest mana
 
 To define the boundary between "Low" and "High" severity classes, the distribution of the historical record (1998-2022) was analyzed. Given that the dataset is heavily dominated by small ignitions (Median = 0.07 ha), a fixed threshold of 10 ha---often used in general literature---was discarded in favor of a data-driven approach.
 
-The arithmetic mean (6.67 ha) was selected as the classification threshold. This decision is statistically justified as it isolates the top 3.6% of events (525 fires), which represent the fires that deviate significantly from the central tendency and account for the vast majority of the total burnt area in Catalonia.
+A threshold of **0.53** ha was selected, corresponding to the **80th percentile** of the distribution. This decision is statistically and operationally justified: it isolates the top 20% of events, which represent the fires that deviate significantly from the "normal" behavior and pose the greatest structural and ecological threat, aligning with the risk categories defined in the **INFOCAT** emergency plan.
 
 ```{r}
 # RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
@@ -1143,7 +1238,7 @@ probs_test <- predict(rf_final_model, data = test_set)$predictions
 preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
 preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-# 5. Mètriques de Qualitat (El que posaràs al TFM)
+# 5. Mètriques de Qualitat 
 # -----------------------------------------------
 library(caret)
 conf_matrix <- confusionMatrix(preds_test, test_set$severity)
@@ -1216,7 +1311,7 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Top 15 Drivers of Wildfire Severity",
+    title = "Top 15 drivers of wildfire severity",
     subtitle = "Classification Model (Threshold: 0.53 ha)",
     x = NULL, 
     y = "Importance (Permutation)"
@@ -1229,44 +1324,48 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
 
 ## Model setup and performance metrics
 
-The Random Forest classifier yielded a robust performance in predicting high-severity wildfire events (\>$6.67$ ha). The model achieved an AUC-ROC of 0.746, indicating a strong discriminative ability to distinguish between routine ignitions and significant fire events.
+The Random Forest classifier yielded a solid performance in predicting high-severity wildfire events, defined by the data-driven threshold of $>0.53$ ha (80th percentile). The model achieved an **AUC-ROC of 0.7145**, indicating a consistent discriminative ability to distinguish between routine ignitions and significant fire events.
 
-The results from the confusion matrix on the independent test set demonstrate a balanced predictive capacity:
+The results from the confusion matrix on the independent test set (2018--2022) demonstrate a balanced predictive capacity, especially considering the complexity of the phenomenon:
 
--   **Sensitivity (recall): 67.3%**. The model successfully identifies two out of every three high-severity fires, which is a critical threshold for early warning and resource allocation.
+-   **Sensitivity (recall): 62.6%**. The model successfully identifies over **60% of high-severity fires**. In a context where these events represent a minority, this level of recall is critical for supporting early warning systems and strategic resource allocation.
 
--   **Specificity: 68.5%**. The model correctly filters out approximately $69\%$ of low-severity fires, maintaining a consistent performance across both classes.
+-   **Specificity: 68.9%**. The model correctly filters out approximately **69% of low-severity fires**, maintaining a robust performance that minimizes false alarms.
 
--   **Balanced accuracy: 67.9%**. Given the extreme class imbalance (only $3.6\%$ prevalence of "High" severity), this metric confirms that the downsampling strategy effectively prevented the model from being biased toward the majority class.
+-   **Balanced accuracy: 65.8%**. This metric, combined with a Kappa of **0.2122**, confirms that the downsampling strategy effectively mitigated the extreme class imbalance, allowing the model to learn the specific drivers of severe fires without being biased toward the majority class (small ignitions).
 
 ## Drivers of severity: variable importance analysis
 
-The variable importance analysis (permutation-based) reveals that **geospatial coordinates and climatic factors** are the primary drivers of fire severity in Catalonia:
+The variable importance analysis (permutation-based) reveals that **geospatial coordinates, temporal, and anthropogenic factors:** are the primary drivers of fire severity in Catalonia:
 
-1.  **Geographic gradient (longitude and latitude)**: These emerged as the most influential predictors. This suggests that specific regional patterns are fundamental in determining whether an ignition escalates into a large fire.
+1.  **Geographic gradient (longitude and latitude)**: These emerged as the most influential predictors. This suggests that specific regional patterns---likely associated with fuel continuity and regional wind corridors---are fundamental in determining whether an ignition escalates.
 
-2.  **Meteorological conditions (`tx`)**: Maximum temperature ranks as the top climatic driver. This confirms the direct relationship between extreme heat episodes and the loss of suppression capacity.
+2.  **Ignition timing and cause**: Interestingly, the hour of detection (hour_detected) and the cause (causa) rank significantly higher in this model than in the regression approach. This validates the hypothesis that when a fire starts (peak solar radiation hours) and how it starts are more decisive for its severity potential than for its final size.
 
-3.  **Temporal and topographic factors**: The hour of detection (`hour_detected`) and altitude (`altitude_z`) also play significant roles. The importance of altitude aligns with our previous topographic analysis, highlighting mid-elevation zones as high-risk areas for fire spread.
+3.  **Topographic and climatic drivers**: Altitude (altitude_z) and maximum temperature (tx) remain key environmental filters. The importance of altitude aligns with our previous analysis, highlighting how mid-elevation zones, with their specific vegetation loads, act as high-risk areas.
 
-4.  **Anthropogenic influence**: Interestingly, "Smokers" (`causa[250] Fumadores`) and proximity to the **Urban-Wildland Interface (WUI)** appear within the top 10 drivers, suggesting that human activity not only triggers fires but also influences the severity context, likely due to the complexity of extinguishing fires near populated areas.
+4.  **Territorial Interface**: The proximity to the Wildland-Urban Interface (WUI) appears as a relevant driver, suggesting that human presence and infrastructure not only increase ignition probability but also condition the severity context, often due to the added complexity of suppression efforts in these sensitive areas.
 
 # Discussion and conclusions
 
-## Discussion: The dual nature of fire prediction
+This storytelling journey has demonstrated that wildfires in Catalonia are not random events but follow distinct patterns that our **Random Forest** model has been able to quantify. The transition from descriptive plots to predictive modeling allows us to draw several key conclusions:
 
-The implementation of a dual Random Forest approach (Regression and Classification) provides a comprehensive understanding of the wildfire regime in Catalonia. While the regression model highlights the continuous drivers of fire size, the classification model---centered on the data-driven threshold of **6.67 ha**---allows us to identify the specific conditions that lead to high-severity events.
+1.  **Meteorological thresholds as critical drivers:** The visual correlation between "intense red" years in the map (like 2003 or 2022) and large burnt areas is confirmed by the RF model. Variables such as **Maximum Temperature (TX)** and **Thermal Amplitude** appear as top predictors in our regression analysis. This confirms that while an ignition can happen anytime, its escalation into a Large Forest Fire (LFF) is strictly governed by atmospheric receptivity.
 
-The results validate that fire severity is a **multi-causal and spatially-dependent phenomenon**. The prominence of **Longitude and Latitude** as top predictors in the classification model suggests that the geographic context (topography, fuel continuity, and distance to the coast) acts as a foundational risk layer. This spatial backbone is then "activated" by meteorological triggers, primarily **Maximum Temperature (TX)**, which emerged as the most critical climatic engine in both models.
+2.  **The "Human-Landscape" Interaction:** The high frequency of fires in the **Coastal and Metropolitan areas** (seen in the spatial analysis) combined with the importance of **Land Cover** and **Cause** in the RF classification model, reveals a clear signature: human pressure provides the ignitions, but the type of vegetation (e.g., *Dense sclerophyllous forests*) dictates the fuel availability. The model effectively identifies that **intentionality** and **negligence** (smokers, power lines) are not just "causes" but statistical predictors of severity.
 
-A key finding is the relatively low importance of **Precipitation (PPT)** compared to thermal stress and location. This suggests that, in the Mediterranean context, the immediate flammability caused by heat peaks and the geographic layout are more decisive at the moment of ignition than recent rainfall patterns. Furthermore, the inclusion of **"Smokers"** and the **Urban-Wildland Interface (WUI)** in the top drivers highlights the undeniable anthropogenic footprint on fire severity, where human activity not only increases ignition probability but also complicates suppression efforts in high-risk zones.
+3.  **Topographic resilience and risk:** Our analysis of altitude showed a "decoupling" between frequency (lowlands) and severity (mid-altitudes). The Random Forest model captures this nuance by using **Altitude** and **Coordinates** to understand that suppression is harder in specific topographic corridors, where fires---though less frequent---tend to be more severe.
 
-## Conclusions
+### **Model performance and limitations**
 
-This study successfully demonstrates that machine learning, specifically the Random Forest algorithm, can effectively navigate the high noise and complexity of wildfire data. The main conclusions are summarized as follows:
+The **Random Forest** has proven to be a robust tool for this dataset, achieving a high balance between identifying small ignitions and predicting major disasters. However, certain "outliers" (like the 1998 megafires or the unusual 2012 winter fires in the Pyrenees) suggest that while the model is excellent at capturing general trends, extreme "Black Swan" events are still heavily influenced by local wind conditions or specific forest management states not fully captured in the current variables.
 
-1.  **Predictive robustness**: The classification model achieved a solid **AUC of 0.746**, with a **sensitivity of 67.3%**. This confirms that it is possible to anticipate two-thirds of high-severity fires using a combination of geographic, meteorological, and anthropogenic variables.
+### **Final synthesis**
 
-2.  **Geographic priority**: The high importance of coordinates and altitude justifies the transition towards **spatialized forest management**. Resources should be strategically pre-positioned based on these identified geographic risk corridors rather than relying on uniform seasonal trends.
+By integrating historical data from the last 25 years, we conclude that:
+
+-   **Prevention** should focus on the **Coastal/WUI zones** during the solar peak (12:00h--17:00h) to reduce ignition frequency.
+
+-   **Suppression resources** should be strategically reinforced in **mid-altitude forest blocks** during heatwave windows, as predicted by our TX-driven model.
 
 # References
