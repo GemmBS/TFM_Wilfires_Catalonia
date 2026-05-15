@@ -290,9 +290,7 @@ The classification model now focuses on predicting the top 20% of the most sever
 
 
 ```{r}
-# ==========================================
 # RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
-# ==========================================
 
 # 1. Preparació de les dades i Split Temporal
 # ------------------------------------------
@@ -311,6 +309,10 @@ low_sev_train  <- train_set %>% filter(severity == "Low")
 low_sev_balanced <- low_sev_train %>% sample_n(nrow(high_sev_train))
 train_balanced <- bind_rows(high_sev_train, low_sev_balanced)
 
+```
+
+```{r}
+
 # 3. Entrenament directe amb Ranger (Més ràpid i sense errors)
 # ------------------------------------------------------------
 set.seed(123)
@@ -320,9 +322,9 @@ rf_final_model <- ranger(
                     hour_detected + afecto_zonas_interfaz_urbano_forestal,
   data            = train_balanced,
   num.trees       = 500,
-  mtry            = 3,            # Valor estàndard (arrel quadrada de predictors)
+  mtry            = 3,            
   importance      = "permutation",
-  probability     = TRUE,         # Necessari per a l'AUC
+  probability     = TRUE,         
   seed            = 123
 )
 
@@ -349,8 +351,8 @@ message("AUC Final (Temporal Validation 2018-2022): ", round(auc(roc_obj), 4))
 ```{r}
 # 1. Extraure la importància i convertir-la en un dataframe net
 importancia_df <- data.frame(
-  Variable = names(rf_class_model$variable.importance),
-  Importance = rf_class_model$variable.importance
+  Variable = names(rf_final_model$variable.importance),
+  Importance = rf_final_model$variable.importance
 ) %>% 
   arrange(desc(Importance)) %>% 
   slice_head(n = 15)  # Ens quedem només amb les 15 millors

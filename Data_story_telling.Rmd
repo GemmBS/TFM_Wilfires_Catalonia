@@ -936,24 +936,39 @@ wfc_model_final <- wfc_final2 %>%
 wfc_model_final <- wfc_model_final %>%
   mutate(log_surface = log1p(superficie_total_forestal))
 
-# Set seed for reproducibility
-set.seed(123)
+# Define the cutoff point
+cutoff <- 2017
 
-# Create the partition based on the target variable
-train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
+# Load necessary libraries
+library(blockCV)
+library(sf)
+library(ranger)
+library(dplyr)
 
-# Generate sets
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
+# --- 2. Spatial Cross-Validation Setup ---
+# Convert the training set to a spatial object (SF)
+# Replace "lon" and "lat" with your actual coordinate column names
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
 
+# Create spatial blocks to prevent the model from "memorizing" locations
+# This ensures validation happens on areas the model hasn't seen
+spatial_folds <- cv_spatial(
+  x = train_sf,
+  column = "log_surface", 
+  k = 10,                  # 10-fold spatial CV
+  size = 15000,           # 15km blocks
+  selection = "random",
+  seed = 123
+)
 
-# Train the Random Forest model
-# We predict 'log_surface' using all other columns in 'train_set'
+# --- 3. Random Forest Model (Regression) ---
+# We use the chronological train_set
+# We exclude the original surface and the 'year' column to focus on environmental drivers
 rf_model <- ranger(
   formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
+  data            = train_set %>% select(-superficie_total_forestal, -year),
   num.trees       = 500,
-  importance      = "permutation", # Important to analyze variable impact later
+  importance      = "permutation", 
   seed            = 123
 )
 
@@ -964,15 +979,16 @@ importance_df <- data.frame(
   Importance = importance_values
 ) %>% arrange(desc(Importance))
 
+
 # 1. Creem el dataframe amb les dades de la teva regressió
 regression_metrics <- tibble(
-  Metric = c("R-squared (Test)", "R-squared (OOB)", "RMSE", "MAE"),
-  Value = c(0.146, 0.158, 0.694, 0.377),
+  Metric = c("R-squared (OOB)", "R-squared (Test)", "RMSE (Test)", "MAE (Test)"),
+  Value = c(0.163, 0.091, 0.669, 0.409),
   Interpretation = c(
-    "Proportion of variance explained (test set)",
-    "Internal model validation estimate",
-    "Root Mean Square Error (log-scale)",
-    "Mean Absolute Error (log-scale)"
+    "Internal variance explained (Out-of-Bag estimate)",
+    "Proportion of variance explained in the test set (2018-2022)",
+    "Root Mean Square Error (average error in log-scale)",
+    "Mean Absolute Error (average deviation in log-scale)"
   )
 )
 
@@ -980,7 +996,7 @@ regression_metrics <- tibble(
 gt_regression_results <- regression_metrics %>%
   gt() %>%
   tab_header(
-    title = "Random Forest Regression performance",
+    title = "Random Forest Regression Performance",
     subtitle = "Evaluation of burnt surface prediction (Log-transformed)"
   ) %>%
   cols_label(
@@ -998,8 +1014,10 @@ gt_regression_results <- regression_metrics %>%
   ) %>%
   tab_options(
     table.font.names = "Times New Roman",
-    heading.title.font.size = px(20)
+    heading.title.font.size = px(20),
+    column_labels.font.weight = "bold"
   )
+
 # Visualització
 gt_regression_results
 
@@ -1016,7 +1034,7 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   coord_flip() +
   theme_minimal() +
-  labs(title = "Variable importance in wildfire surface prediction",
+  labs(title = "Variable Importance in Wildfire Surface Prediction",
        x = "Predictors", y = "Importance (Permutation)")
 ```
 
