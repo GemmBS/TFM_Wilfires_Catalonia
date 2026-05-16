@@ -219,7 +219,7 @@ ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Top 15 Variable Importance: Wildfire Surface Prediction",
+    title = "Variable importance in wildfire surface prediction",
     subtitle = "Regression Model | 10-fold Spatial Cross-Validation",
     x = NULL, 
     y = "Importance (Permutation)"
@@ -356,7 +356,7 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   coord_flip() +
   theme_minimal() +
   labs(
-    title = "Top 15 Drivers of Wildfire Severity",
+    title = "Top 15 drivers of wildfire severity",
     subtitle = "Classification Model (Threshold: 0.53 ha)",
     x = NULL, 
     y = "Importance (Permutation)"
@@ -367,8 +367,8 @@ ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
   )
 ```
 
+
 ```{r}
 library(knitr)
 purl("RF.Rmd")
 ```
-
