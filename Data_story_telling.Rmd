@@ -1069,7 +1069,7 @@ To refine the prevention strategies against intentional fires, it is essential t
 
 In this stage, a Random Forest regressor was implemented to quantify the predictive power of environmental and anthropogenic variables over fire severity (Burnt Area). Random Forest was selected due to its robustness against outliers and its ability to capture non-linear relationships, which are prevalent in wildfire dynamics.
 
-```{r}
+```{r rf_training, include=FALSE}
 # 1. Feature Selection and Formatting
 # FINAL MODEL DATASET SELECTION
 wfc_model_final <- wfc_final2 %>%
@@ -1204,6 +1204,11 @@ gt_regression_results <- regression_metrics %>%
     column_labels.font.weight = "bold"
   )
 
+# Visualització
+gt_regression_results
+```
+
+```{r}
 # Visualització
 gt_regression_results
 ```
