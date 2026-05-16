@@ -66,6 +66,7 @@ library(pROC)
 library(tibble)
 library(bslib)
 library(bsicons)
+library(sf)
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
@@ -715,32 +716,48 @@ The right panel (**Fire severity by altitude**) provides a more complex perspect
 # Chapter 4: The meteorological dimension
 
 ```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
-# Gràfic de densitat: On es concentren els incendis segons Clima?
 ggplot(wfc_final2, aes(x = tx, y = ppt)) +
-  stat_density_2d(aes(fill = ..level..), geom = "polygon", color = "white") +
-  geom_point(aes(size = superficie_total_forestal), alpha = 0.2, color = "orange") +
-  scale_fill_viridis_c(option = "magma", name = "Density") +
-  scale_size_continuous(range = c(1, 10), name = "Area (ha)") +
-  theme_minimal() +
+  # 1. El mapa de densitat de fons com a polígons plens (omple el fons de colors)
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", alpha = 0.85) +
+  
+  # 2. Canviem la paleta a "inferno" o "magma" perquè ressalti el nucli on es concentren més focs
+  scale_fill_viridis_c(option = "inferno", name = "Ignition Density") +
+  
+  # 3. En lloc de pintar TOTS els punts, pintem NOMÉS els incendis grans (Ex: > 10 ha) 
+  # perquè es vegi on la meteorologia es torna perillosa sense tapar el mapa
+  geom_point(data = filter(wfc_final2, superficie_total_forestal > 10),
+             aes(size = superficie_total_forestal), 
+             alpha = 0.5, color = "white", shape = 21, fill = "darkred") +
+  
+  scale_size_continuous(range = c(2, 12), name = "Large Fires (>10 ha)", labels = comma) +
+  
+  # 4. Ajustem els límits de l'eix Y perquè el 95% dels focs passen amb poca pluja (< 20mm)
+  coord_cartesian(ylim = c(-1, 25)) + 
+  
+  theme_minimal(base_size = 13) +
   labs(
     title = "Meteorological fingerprint of wildfires",
-    subtitle = "Interaction between Max Temperature (TX) and Precipitation (PPT)",
+    subtitle = "Density concentration of ignitions by Maximum Temperature (TX) and Precipitation (PPT)",
     x = "Max Temperature (°C)",
-    y = "Precipitation (mm)"
+    y = "Precipitation on ignition day (mm)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    panel.grid.minor = element_blank()
   )
 ```
 
 ### TX and PPT Interaction
 
-The scatter plot and density analysis presented in the previous plot illustrate the climatic envelope in which wildfires occur in Catalonia. This "fingerprint" reveals a critical dependence on specific atmospheric conditions for fire spread and intensification.
+The scatter plot and density analysis illustrated above define the precise climatic envelope in which wildfires operate in Catalonia. This "fingerprint" reveals a critical threshold-dependence on specific atmospheric conditions for fire spread and intensification.
 
--   **The zero-precipitation constraint**: A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density heatmap (indicated by the lighter yellow tones) confirms that the vast majority of fires occur under conditions of absolute lack of immediate rainfall. This points to a strong inverse correlation between moisture availability and fire occurrence, indicating that recent precipitation may act as a critical limiting factor for ignition and subsequent spread.
+-   **The zero-precipitation constraint:** A striking pattern is the extreme concentration of ignition events along the 0 mm precipitation line. The density contour mapping (indicated by the darker purple-toned layers at the base) confirms that the absolute majority of fires thrive under conditions of rainfall absence. This highlights that active precipitation acts as a strict limiting factor for ignition, keeping the baseline risk compressed to dry days.
 
--   **The thermal threshold for severity**: When observing the size of the points (representing **area in ha**), there is a clear shift as we move toward the right of the X-axis. Although fires are frequent between 15°C and 30°C, the **Large Wildfires**---represented by the largest bubbles---are almost exclusively clustered between **25°C and 40°C**. This thermal window represents the "danger zone" where suppression efforts face the greatest challenges.
+-   **The thermal threshold for severity:** When observing the distribution of filtered significant events (**fires \>10 ha**), there is a clear directional shift toward the right of the X-axis. While smaller ignitions can occur within a broader temperate margin (**15°C** to **25°C**), the Large Wildfires---represented by the largest crimson bubbles---are almost exclusively clustered within the **30°C to 40°C** window. This thermal zone represents the high-danger threshold where atmospheric demand accelerates fuel flammability.
 
--   **Atmospheric "Dry windows"**: There are occasional ignitions at higher precipitation levels (up to 60-70 mm), but these remain isolated, small-scale events (dots with almost no radius). This suggests that even if an ignition occurs during a rainy period, the lack of fuel continuity or the high fuel moisture content prevents the fire from gaining significant size.
+-   **Atmospheric resilience:** There are occasional, isolated ignitions at slightly higher precipitation levels (up to **15--20 mm**), but these remain small-scale events with almost no geographic radius. This suggests that even if an ignition occurs during or shortly after a light rainy period, the high fuel moisture content prevents the fire from gaining significant size or overcoming suppression efforts.
 
--   **Operational implications**: The "Meteorological Fingerprint" suggests that the risk is not linear but threshold-based. Once precipitation reaches 0 mm and temperature crosses the 30°C mark, the landscape enters a state of high receptivity where any ignition has a high probability of becoming a high-impact event.
+-   **Operational implications for Random Forest:** This fingerprint demonstrates that wildfire risk in the Mediterranean is not linear but threshold-driven. Once precipitation drops to zero and maximum temperature crosses the 30°C mark, the landscape enters a critical state of high receptivity.
 
 ```{r warning=FALSE, message=FALSE, fig.height=7, fig.width=10}
 # Evolució de la TX mitjana per any
@@ -853,6 +870,64 @@ The analysis of wildfire impact across different land cover types reveals a crit
 -   **Relative resilience of deciduous forests**: In contrast, dense deciduous broadleaf forests show significantly lower total burnt areas (7,661 ha). This may be attributed to higher fuel moisture retention and the lower flammability of broadleaf litter compared to needle-leaf species.
 
 -   **Urban and infrastructure pressure**: The appearance of the Road network and Urban expansion in the burnt area rankings highlights the increasing risk at the Wildland-Urban Interface (WUI), where human activity acts as a primary driver of landscape transformation through fire.
+
+## Tracking landscape transformation and fuel dynamics over 25 years
+
+```{r warning=FALSE, message=FALSE, fig.width=14, fig.height=8}
+library(tidyverse)
+library(scales)
+
+# 1. Seleccionar els 6-8 usos del sòl més importants
+usos_top <- wfc_final2 %>%
+  filter(!is.na(land_cover_type) & superficie_total_forestal > 0) %>%
+  count(land_cover_type) %>%
+  slice_max(n, n = 7) %>%
+  pull(land_cover_type)
+
+# 2. Preparar les dades calculant el percentatge (proporció) per a cada any
+prop_sòl_anual <- wfc_final2 %>%
+  filter(!is.na(land_cover_type) & superficie_total_forestal > 0) %>%
+  mutate(land_cover_clean = if_else(land_cover_type %in% usos_top, land_cover_type, "Other woody/mixed areas")) %>%
+  group_by(year, land_cover_clean) %>%
+  summarise(area_cremada = sum(superficie_total_forestal, na.rm = TRUE), .groups = 'drop') %>%
+  # CALCULEM EL PERCENTATGE PER ANY
+  group_by(year) %>%
+  mutate(percentatge = area_cremada / sum(area_cremada)) %>%
+  ungroup()
+
+# 3. Crear el gràfic amb les etiquetes de percentatge
+ggplot(prop_sòl_anual, aes(x = as.factor(year), y = area_cremada, fill = land_cover_clean)) +
+  geom_bar(stat = "identity", position = "fill", width = 0.75) +
+  # AFEGIM ELS PERCENTATGES DINS LES BARRES
+  geom_text(
+    aes(
+      label = if_else(percentatge > 0.04, percent(percentatge, accuracy = 1), "")
+    ),
+    position = position_fill(vjust = 0.5), # Els centra al mig de cada tros de barra
+    size = 3, 
+    fontface = "bold", 
+    color = "white" # Ressalta sobre el fons fosc de la paleta viridis
+  ) +
+  scale_y_continuous(labels = percent) +
+  scale_fill_viridis_d(option = "viridis", direction = -1) + 
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Evolution of burnt area composition by Land Cover Type (1998-2022)",
+    subtitle = "Annual proportion of total wildfire impact across different landscapes (Labels > 4%)",
+    x = "Year",
+    y = "Percentage of Annual Burnt Area",
+    fill = "Land Cover Type"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 16)
+  )
+```
+
+The 100% stacked bar chart reveals a clear structural trend in Catalonia's fire history: the progressive **homogenization of fuel**. While the early years of the series (like 1998 or 2003) showed a high transition of fires through agricultural lands (*Herbaceous crops* reaching up to 61%), the last decade is dominated by continuous fuel models, specifically **Shrublands** and **Dense sclerophyllous forests**. This vertical fingerprint visually validates the impact of rural abandonment, showing how the disappearance of the traditional agricultural mosaic has left the territory exposed to fires that burn almost exclusively within dense, uninterrupted ecological blocks.
 
 # Chapter 6: Analysis of ignition sources and drivers
 
@@ -967,12 +1042,12 @@ ggplot(motivacions_data, aes(y = reorder(motivacion, frequency), x = frequency))
   ) +
   # Ajustos globals de les mides del text del tema
   theme(
-    plot.title = element_text(size = 18, face = "bold"),    # Títol principal
-    plot.subtitle = element_text(size = 14),               # Subtítol
-    axis.text.y = element_text(size = 12, color = "black"), # Etiquetes de l'eix Y (motivacions)
-    axis.text.x = element_text(size = 11),                 # Números de l'eix X
-    axis.title.x = element_text(size = 13, margin = margin(t = 10)), # Títol eix X
-    plot.margin = margin(10, 30, 10, 10)                   # Marge dret extra
+    plot.title = element_text(size = 18, face = "bold"),    
+    plot.subtitle = element_text(size = 14),               
+    axis.text.y = element_text(size = 12, color = "black"), 
+    axis.text.x = element_text(size = 11),                
+    axis.title.x = element_text(size = 13, margin = margin(t = 10)), 
+    plot.margin = margin(10, 30, 10, 10)                   
   )
 ```
 
@@ -1045,7 +1120,7 @@ test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
 # --- 2. Creació de Blocs Espacials (Spatial CV) ---
 train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
 
-
+library(blockCV)
 set.seed(123)
 spatial_folds <- cv_spatial(
   x = train_sf,
