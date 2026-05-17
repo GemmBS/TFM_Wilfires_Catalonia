@@ -453,7 +453,7 @@ This interactive map bridges the gap between raw data and territorial management
 
 In this section, we examine specific years that defined the contemporary fire regime in Catalonia. These snapshots from the interactive map illustrate the convergence of extreme weather (represented by color intensity) and high fuel loads (represented by circle size).
 
-#### Year 1998: the central Catalonia disaster
+### Year 1998: the central Catalonia disaster
 
 The year 1998 marks a turning point in Catalan wildfire history, characterized by massive high-intensity events driven by extreme thermal stress.
 
@@ -469,11 +469,11 @@ The year 1998 marks a turning point in Catalan wildfire history, characterized b
 
 -   **Spatial pattern**: While large "megafires" dominated the interior, a high frequency of smaller ignitions persisted along the coastal line and specific points in the Pyrenees, reflecting the dual nature of Catalonia's fire pressure.
 
-#### Year 1999: Data gap in historical records
+### Year 1999: Data gap in historical records
 
 No wildfire records are available for the year 1999 in the current consolidated dataset.
 
-#### Year 2000: Extreme events and seasonal shifts
+### Year 2000: Extreme events and seasonal shifts
 
 Although the total number of records in 2000 did not reach the levels of the 1998 season, several significant events stood out due to their scale and timing. The year was characterized by a high concentration of events along the coastal regions and two major fires that marked the annual statistics.
 
@@ -495,7 +495,7 @@ The 2003 season was characterized by extreme thermal stress, as evidenced by the
 
 -   **Gallifa (August):** Another critical event took place in Gallifa, where temperatures reached an extreme peak of **37ºC**. This fire affected **1,263 ha**, further illustrating the direct correlation between extreme heat episodes and the escalation of fire severity.
 
-#### Year 2005: High frequency and central Catalonia clusters
+### Year 2005: High frequency and central Catalonia clusters
 
 The 2005 season was characterized by a very high frequency of fire events, particularly during the summer months, with affected areas of varying extensions across the territory. The interactive map reveals a significant concentration of fires in the central region of Catalonia, where several large-scale events occurred in close spatial and temporal proximity.
 
@@ -509,7 +509,7 @@ The 2005 season was characterized by a very high frequency of fire events, parti
 
 Following 2005, a general downward trend is observed where wildfires gradually decrease in both frequency and intensity until the next major peak in 2012.
 
-#### Year 2012: Large forest fires and Pyrenean anomalies
+### Year 2012: Large forest fires and Pyrenean anomalies
 
 The 2012 season stands out as one of the most critical in the historical series, marked by the return of Large Forest Fires (LFF) and significant out-of-season activity in high-altitude regions.
 
@@ -525,7 +525,7 @@ The 2012 season stands out as one of the most critical in the historical series,
 
 Following the critical events of 2012, the historical series shows a period of relative stabilization, with wildfire intensity and frequency gradually decreasing once again until the next shift in the trend observed in 2019.
 
-#### Year 2019: The Ebro basin crisis
+### Year 2019: The Ebro basin crisis
 
 The 2019 season is largely defined by a single catastrophic event in the Ebro basin, while the rest of the year maintained a relatively low-intensity profile across the territory.
 
@@ -533,7 +533,7 @@ The 2019 season is largely defined by a single catastrophic event in the Ebro ba
 
 -   **La Torre de l'Espanyol (June):** This major wildfire was the most significant event of the year, burning **4,281 ha** over nearly ten days. The ignition was caused by the improper management of farm waste (burning garbage), which, combined with extreme heat and low humidity, led to one of the most difficult suppression efforts of the decade.
 
-#### Year 2022: Lightning
+### Year 2022: Lightning
 
 To conclude the historical series, the year 2022 stands out as a new peak of severity, marked by extreme weather conditions and two major events that illustrate very different origins:
 
