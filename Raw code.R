@@ -1413,12 +1413,14 @@ library(pROC)
 library(tibble)
 library(bslib)
 library(bsicons)
+library(sf)
 # 2. Data Import
 wfc_final2 <- read_csv(here("Data", "wfc_final2.csv"))
 
 
 
-## -------------------------------------------------------------------------------------------------------------------------------------------------
+## ----warning=FALSE, message=FALSE-----------------------------------------------------------------------------------------------------------------
+options(bslib.precompiled = FALSE)
 total_fires <- nrow(wfc_final2)
 total_area <- sum(wfc_final2$superficie_total_forestal, na.rm = TRUE)
 
@@ -1871,18 +1873,34 @@ combined_plot
 
 
 ## ----warning=FALSE, message=FALSE, fig.height=7, fig.width=10-------------------------------------------------------------------------------------
-# Gràfic de densitat: On es concentren els incendis segons Clima?
 ggplot(wfc_final2, aes(x = tx, y = ppt)) +
-  stat_density_2d(aes(fill = ..level..), geom = "polygon", color = "white") +
-  geom_point(aes(size = superficie_total_forestal), alpha = 0.2, color = "orange") +
-  scale_fill_viridis_c(option = "magma", name = "Density") +
-  scale_size_continuous(range = c(1, 10), name = "Area (ha)") +
-  theme_minimal() +
+  # 1. El mapa de densitat de fons com a polígons plens (omple el fons de colors)
+  stat_density_2d(aes(fill = after_stat(level)), geom = "polygon", alpha = 0.85) +
+  
+  # 2. Canviem la paleta a "inferno" o "magma" perquè ressalti el nucli on es concentren més focs
+  scale_fill_viridis_c(option = "inferno", name = "Ignition Density") +
+  
+  # 3. En lloc de pintar TOTS els punts, pintem NOMÉS els incendis grans (Ex: > 10 ha) 
+  # perquè es vegi on la meteorologia es torna perillosa sense tapar el mapa
+  geom_point(data = filter(wfc_final2, superficie_total_forestal > 10),
+             aes(size = superficie_total_forestal), 
+             alpha = 0.5, color = "white", shape = 21, fill = "darkred") +
+  
+  scale_size_continuous(range = c(2, 12), name = "Large Fires (>10 ha)", labels = comma) +
+  
+  # 4. Ajustem els límits de l'eix Y perquè el 95% dels focs passen amb poca pluja (< 20mm)
+  coord_cartesian(ylim = c(-1, 25)) + 
+  
+  theme_minimal(base_size = 13) +
   labs(
     title = "Meteorological fingerprint of wildfires",
-    subtitle = "Interaction between Max Temperature (TX) and Precipitation (PPT)",
+    subtitle = "Density concentration of ignitions by Maximum Temperature (TX) and Precipitation (PPT)",
     x = "Max Temperature (°C)",
-    y = "Precipitation (mm)"
+    y = "Precipitation on ignition day (mm)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    panel.grid.minor = element_blank()
   )
 
 
@@ -1970,6 +1988,60 @@ land_cover_tree_plot <- p5 / p6 +
   )
 
 print(land_cover_tree_plot)
+
+
+## ----warning=FALSE, message=FALSE, fig.width=14, fig.height=8-------------------------------------------------------------------------------------
+library(tidyverse)
+library(scales)
+
+# 1. Seleccionar els 6-8 usos del sòl més importants
+usos_top <- wfc_final2 %>%
+  filter(!is.na(land_cover_type) & superficie_total_forestal > 0) %>%
+  count(land_cover_type) %>%
+  slice_max(n, n = 7) %>%
+  pull(land_cover_type)
+
+# 2. Preparar les dades calculant el percentatge (proporció) per a cada any
+prop_sòl_anual <- wfc_final2 %>%
+  filter(!is.na(land_cover_type) & superficie_total_forestal > 0) %>%
+  mutate(land_cover_clean = if_else(land_cover_type %in% usos_top, land_cover_type, "Other woody/mixed areas")) %>%
+  group_by(year, land_cover_clean) %>%
+  summarise(area_cremada = sum(superficie_total_forestal, na.rm = TRUE), .groups = 'drop') %>%
+  # CALCULEM EL PERCENTATGE PER ANY
+  group_by(year) %>%
+  mutate(percentatge = area_cremada / sum(area_cremada)) %>%
+  ungroup()
+
+# 3. Crear el gràfic amb les etiquetes de percentatge
+ggplot(prop_sòl_anual, aes(x = as.factor(year), y = area_cremada, fill = land_cover_clean)) +
+  geom_bar(stat = "identity", position = "fill", width = 0.75) +
+  # AFEGIM ELS PERCENTATGES DINS LES BARRES
+  geom_text(
+    aes(
+      label = if_else(percentatge > 0.04, percent(percentatge, accuracy = 1), "")
+    ),
+    position = position_fill(vjust = 0.5), # Els centra al mig de cada tros de barra
+    size = 3, 
+    fontface = "bold", 
+    color = "white" # Ressalta sobre el fons fosc de la paleta viridis
+  ) +
+  scale_y_continuous(labels = percent) +
+  scale_fill_viridis_d(option = "viridis", direction = -1) + 
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Evolution of burnt area composition by Land Cover Type (1998-2022)",
+    subtitle = "Annual proportion of total wildfire impact across different landscapes (Labels > 4%)",
+    x = "Year",
+    y = "Percentage of Annual Burnt Area",
+    fill = "Land Cover Type"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "bottom",
+    legend.box = "vertical",
+    panel.grid.major.x = element_blank(),
+    plot.title = element_text(face = "bold", size = 16)
+  )
 
 
 ## ----fig.width=16, fig.height=12, out.width="100%"------------------------------------------------------------------------------------------------
@@ -2069,16 +2141,16 @@ ggplot(motivacions_data, aes(y = reorder(motivacion, frequency), x = frequency))
   ) +
   # Ajustos globals de les mides del text del tema
   theme(
-    plot.title = element_text(size = 18, face = "bold"),    # Títol principal
-    plot.subtitle = element_text(size = 14),               # Subtítol
-    axis.text.y = element_text(size = 12, color = "black"), # Etiquetes de l'eix Y (motivacions)
-    axis.text.x = element_text(size = 11),                 # Números de l'eix X
-    axis.title.x = element_text(size = 13, margin = margin(t = 10)), # Títol eix X
-    plot.margin = margin(10, 30, 10, 10)                   # Marge dret extra
+    plot.title = element_text(size = 18, face = "bold"),    
+    plot.subtitle = element_text(size = 14),               
+    axis.text.y = element_text(size = 12, color = "black"), 
+    axis.text.x = element_text(size = 11),                
+    axis.title.x = element_text(size = 13, margin = margin(t = 10)), 
+    plot.margin = margin(10, 30, 10, 10)                   
   )
 
 
-## -------------------------------------------------------------------------------------------------------------------------------------------------
+## ----rf_training, include=FALSE-------------------------------------------------------------------------------------------------------------------
 # 1. Feature Selection and Formatting
 # FINAL MODEL DATASET SELECTION
 wfc_model_final <- wfc_final2 %>%
@@ -2093,7 +2165,7 @@ wfc_model_final <- wfc_final2 %>%
     tx, ppt, thermal_amplitude,
     
     # Time
-    month_detected, hour_detected,
+    month_detected, hour_detected, year,
     
     # Land Cover & Risk
     land_cover_id, afecto_zonas_interfaz_urbano_forestal, 
@@ -2114,43 +2186,76 @@ wfc_model_final <- wfc_final2 %>%
 wfc_model_final <- wfc_model_final %>%
   mutate(log_surface = log1p(superficie_total_forestal))
 
-# Set seed for reproducibility
+# Define the cutoff point
+cutoff <- 2017
+
+# Create the sets chronologically
+train_set <- wfc_model_final[wfc_model_final$year <= cutoff, ]
+test_set  <- wfc_model_final[wfc_model_final$year > cutoff, ]
+
+# Check dimensions
+# message("Training set (1998-2017): ", nrow(train_set))
+# message("Testing set (2018-2022): ", nrow(test_set))
+
+
+# --- 2. Creació de Blocs Espacials (Spatial CV) ---
+train_sf <- st_as_sf(train_set, coords = c("longitude", "latitude"), crs = 4326)
+
+library(blockCV)
 set.seed(123)
-
-# Create the partition based on the target variable
-train_index <- createDataPartition(wfc_model_final$log_surface, p = 0.8, list = FALSE)
-
-# Generate sets
-train_set <- wfc_model_final[train_index, ]
-test_set  <- wfc_model_final[-train_index, ]
-
-
-# Train the Random Forest model
-# We predict 'log_surface' using all other columns in 'train_set'
-rf_model <- ranger(
-  formula         = log_surface ~ ., 
-  data            = train_set %>% select(-superficie_total_forestal), # Exclude the original non-log surface
-  num.trees       = 500,
-  importance      = "permutation", # Important to analyze variable impact later
-  seed            = 123
+spatial_folds <- cv_spatial(
+  x = train_sf,
+  column = "log_surface", 
+  k = 10,                # 10 folds com deies
+  size = 15000,          # Blocs de 15km
+  selection = "random"
 )
 
-# Get importance
-importance_values <- importance(rf_model)
-importance_df <- data.frame(
-  Variable = names(importance_values),
-  Importance = importance_values
-) %>% arrange(desc(Importance))
+# Extraiem els índexs per a caret
+folds_index <- lapply(spatial_folds$folds_list, function(x) as.integer(x[[1]]))
+
+## Train model 
+# --- 3. Configuració de Caret amb índexs espacials ---
+fitControl_reg <- trainControl(
+  method = "cv",
+  index = folds_index,     
+  savePredictions = "final"
+)
+
+# --- 4. Entrenament amb Ranger ---
+set.seed(123)
+rf_reg_cv <- train(
+  log_surface ~ .,
+  data = train_set %>% select(-superficie_total_forestal, -year),
+  method = "ranger",
+  trControl = fitControl_reg,
+  tuneGrid = expand.grid(
+    mtry = 3, 
+    splitrule = "variance", 
+    min.node.size = 5
+  ),
+  importance = "permutation"
+)
+
+
+## Test Set 2018-2022
+# # --- 5. Predicció sobre el Test Set ---
+# reg_preds <- predict(rf_reg_cv, newdata = test_set)
+# 
+# # --- 6. Mètriques finals per a la teva taula gt ---
+# reg_metrics <- postResample(pred = reg_preds, obs = test_set$log_surface)
+# print(reg_metrics)
 
 # 1. Creem el dataframe amb les dades de la teva regressió
+# 1. Creem el dataframe amb les dades REALS de la teva Spatial CV i Test
 regression_metrics <- tibble(
-  Metric = c("R-squared (Test)", "R-squared (OOB)", "RMSE", "MAE"),
-  Value = c(0.146, 0.158, 0.694, 0.377),
+  Metric = c("R-squared (Spatial CV)", "R-squared (Test)", "RMSE (Test)", "MAE (Test)"),
+  Value = c(0.108, 0.108, 0.656, 0.372), # Valors actualitzats segons el teu últim print
   Interpretation = c(
-    "Proportion of variance explained (test set)",
-    "Internal model validation estimate",
-    "Root Mean Square Error (log-scale)",
-    "Mean Absolute Error (log-scale)"
+    "Internal variance explained (10-fold Spatial CV)",
+    "Proportion of variance explained in the test set (2018-2022)",
+    "Root Mean Square Error (average error in log-scale)",
+    "Mean Absolute Error (average deviation in log-scale)"
   )
 )
 
@@ -2158,7 +2263,7 @@ regression_metrics <- tibble(
 gt_regression_results <- regression_metrics %>%
   gt() %>%
   tab_header(
-    title = "Random Forest Regression performance",
+    title = "Random Forest Regression Performance",
     subtitle = "Evaluation of burnt surface prediction (Log-transformed)"
   ) %>%
   cols_label(
@@ -2176,97 +2281,126 @@ gt_regression_results <- regression_metrics %>%
   ) %>%
   tab_options(
     table.font.names = "Times New Roman",
-    heading.title.font.size = px(20)
+    heading.title.font.size = px(20),
+    column_labels.font.weight = "bold"
   )
+
 # Visualització
 gt_regression_results
 
-# Predict on test set
-predictions <- predict(rf_model, data = test_set)$predictions
 
-# Calculate Performance Metrics (RMSE and R2)
-#postResample(pred = predictions, obs = test_set$log_surface)
+## -------------------------------------------------------------------------------------------------------------------------------------------------
+# Visualització
+gt_regression_results
 
 
 ## ----fig.width=16, fig.height=7, fig.width=10-----------------------------------------------------------------------------------------------------
-# Plot importance
+# 1. Extraure la importància i filtrar les 15 millors
+importance_df <- data.frame(
+  Variable = names(rf_reg_cv$finalModel$variable.importance),
+  Importance = rf_reg_cv$finalModel$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb el Top 15
+
+# 2. Gràfic amb ggplot2
+library(ggplot2)
+
 ggplot(importance_df, aes(x = reorder(Variable, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_bar(stat = "identity", fill = "steelblue", width = 0.7) +
   coord_flip() +
   theme_minimal() +
-  labs(title = "Variable importance in wildfire surface prediction",
-       x = "Predictors", y = "Importance (Permutation)")
+  labs(
+    title = "Variable importance in wildfire surface prediction",
+    subtitle = "Regression Model | 10-fold Spatial Cross-Validation",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10),
+    panel.grid.minor = element_blank()
+  )
 
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------
-# Creem la classe binària (Severity)
-#wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 6.67, "High", "Low"))
+# RANDOM FOREST CLASSIFICATION: TEMPORAL VALIDATION
 
-# 1. Separació inicial (Hold-out)
-#set.seed(123)
-#train_index <- createDataPartition(wfc_model_final$severity, p = 0.8, list = FALSE)
-#train_set <- wfc_model_final[train_index, ]
-#test_set  <- wfc_model_final[-train_index, ]
+# 1. Preparació de les dades i Split Temporal
+# ------------------------------------------
+wfc_model_final$severity <- as.factor(ifelse(wfc_model_final$superficie_total_forestal > 0.53, "High", "Low"))
 
-# 1. Afegim 'sampling = "down"' al trainControl
-#fitControl <- trainControl(
-#  method = "cv",
-#  number = 10,
-#  classProbs = TRUE,
-#  summaryFunction = twoClassSummary,
-#  savePredictions = "final",
-#  sampling = "down" 
-#)
+train_set <- wfc_model_final %>% filter(year <= 2017)
+test_set  <- wfc_model_final %>% filter(year > 2017)
 
-#rf_final_model <- train(
-#  severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + land_cover_id + latitude + longitude + month_detected + hour_detected + #afecto_zonas_interfaz_urbano_forestal,
-#  data = train_set,
-#  method = "ranger",
-#  trControl = fitControl,
-#  metric = "ROC", 
-#  importance = "permutation"
-#)
+# 2. Downsampling manual del Train Set (Equilibrem 50/50)
+# ------------------------------------------------------
+set.seed(123)
+high_sev_train <- train_set %>% filter(severity == "High")
+low_sev_train  <- train_set %>% filter(severity == "Low")
 
-# Prediccions sobre el test_set
-#final_preds <- predict(rf_final_model, newdata = test_set)
-#final_probs <- predict(rf_final_model, newdata = test_set, type = "prob")
+# Igualem el nombre d'incendis petits al de grans
+low_sev_balanced <- low_sev_train %>% sample_n(nrow(high_sev_train))
+train_balanced <- bind_rows(high_sev_train, low_sev_balanced)
 
-# 1. Confusion Matrix (per a Kappa, Sensibilitat i Especificitat)
-#conf_matrix <- confusionMatrix(final_preds, test_set$severity)
-#print(conf_matrix)
+# 3. Entrenament directe amb Ranger (Més ràpid i sense errors)
+# ------------------------------------------------------------
+set.seed(123)
+rf_final_model <- ranger(
+  formula         = severity ~ tx + ppt + thermal_amplitude + altitude_z + causa + 
+    land_cover_id + latitude + longitude + month_detected + 
+    hour_detected + afecto_zonas_interfaz_urbano_forestal,
+  data            = train_balanced,
+  num.trees       = 500,
+  mtry            = 3,            
+  importance      = "permutation",
+  probability     = TRUE,         
+  seed            = 123
+)
 
-# 2. AUC-ROC 
-#roc_obj <- roc(test_set$severity, final_probs$High)
-#auc_value <- auc(roc_obj)
-#print(paste("AUC final del model:", auc_value))
+# 4. Prediccions sobre el Test Set (2018-2022)
+# --------------------------------------------
+# Obtenim probabilitats i classes
+probs_test <- predict(rf_final_model, data = test_set)$predictions
+preds_test <- ifelse(probs_test[, "High"] > 0.5, "High", "Low")
+preds_test <- factor(preds_test, levels = c("High", "Low"))
 
-# 1. Extraure la importància
-#importancia_data <- varImp(rf_final_model, scale = FALSE)
+# 5. Mètriques de Qualitat 
+# -----------------------------------------------
+library(caret)
+conf_matrix <- confusionMatrix(preds_test, test_set$severity)
 
-# 2. Seleccionar només les 10 més importants
-#plot(importancia_data, top = 15, main = "Top 10 drivers of wildfire severity", col = "#d95f02")
+library(pROC)
+#roc_obj <- roc(test_set$severity, probs_test[, "High"])
+#message("AUC Final (Temporal Validation 2018-2022): ", round(auc(roc_obj), 4))
+
 
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------
-# 1. Creem el dataframe amb les dades de la teva Confusion Matrix
+# 1. Creem el dataframe amb les dades de la teva Confusion Matrix REALS
 classification_metrics <- tibble(
   Metric = c("AUC (Area Under Curve)", "Sensitivity (Recall)", "Specificity", 
              "Balanced Accuracy", "Accuracy", "Kappa"),
-  Value = c(0.7459, 0.6731, 0.6847, 0.6789, 0.6842, 0.0735),
-  Interpretation = c("Excellent discriminative capacity", "Ability to detect High Severity fires", 
-                     "Ability to detect Low Severity fires", "Average of sensitivity and specificity", 
-                     "Overall correct predictions", "Agreement above chance")
+  Value = c(0.7145, 0.6260, 0.6893, 0.6576, 0.6789, 0.2122),
+  Interpretation = c(
+    "Good discriminative capacity", 
+    "Ability to detect High Severity fires", 
+    "Ability to detect Low Severity fires", 
+    "Average of sensitivity and specificity", 
+    "Overall correct predictions", 
+    "Fair agreement above chance"
+  )
 )
 
 # 2. Generem la taula gt
 gt_model_results <- classification_metrics %>%
   gt() %>%
   tab_header(
-    title = "Random Forest classification performance",
-    subtitle = "Evaluation of high severity fire prediction (> 6.67 ha)"
+    title = "Random Forest Classification Performance",
+    subtitle = "Prediction of High Severity Fires (> 0.53 ha)"
   ) %>%
   cols_label(
-    Metric = "Performance metric",
+    Metric = "Performance Metric",
     Value = "Value",
     Interpretation = "Analysis"
   ) %>%
@@ -2280,20 +2414,37 @@ gt_model_results <- classification_metrics %>%
   ) %>%
   tab_options(
     table.font.names = "Times New Roman",
-    heading.title.font.size = px(20)
+    heading.title.font.size = px(20),
+    column_labels.font.weight = "bold"
   )
 
 # Visualització
 gt_model_results
 
 
-## ----echo=FALSE, out.width="100%", fig.align="center", fig.cap="Classification Model Performance: Confusion Matrix and Statistics"----------------
-# Carreguem la llibreria per gestionar imatges
-library(knitr)
+## ----fig.width=16, fig.height=7, fig.width=10-----------------------------------------------------------------------------------------------------
+# 1. Extraure la importància i convertir-la en un dataframe net
+importancia_df <- data.frame(
+  Variable = names(rf_final_model$variable.importance),
+  Importance = rf_final_model$variable.importance
+) %>% 
+  arrange(desc(Importance)) %>% 
+  slice_head(n = 15)  # Ens quedem només amb les 15 millors
 
-# Inserim la imatge des de la subcarpeta images
-include_graphics("images/ClasRF.PNG")
+# 2. Fer el gràfic amb ggplot2 (que queda molt més professional per al TFM)
 
-
-
+ggplot(importancia_df, aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "#d95f02") + # El color taronja que t'agrada
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 15 drivers of wildfire severity",
+    subtitle = "Classification Model (Threshold: 0.53 ha)",
+    x = NULL, 
+    y = "Importance (Permutation)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 10)
+  )
 
