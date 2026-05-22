@@ -35,7 +35,7 @@ To address the inherent complexity of wildfire behaviour, the project leverages 
 - **Robust Spatial Validation (blockCV)**: A modelling pipeline protected against spatial autocorrelation through a 10-fold Spatial Cross-Validation structure and evaluated against an independent temporal test set.
 - **Machine Learning (Random Forest)**: A dual-stage modelling approach designed to assess wildfire dynamics from two distinct perspectives:
   - **Regression**: To model the continuous fire scale and evaluate the predictability of final burnt areas based on static environmental constraints at the ignition point.
-  - **Classification**: To isolate and identify the underlying meteorological and anthropogenic drivers behind high-severity fire events (the top 3.6% of largest historical fires).
+  - **Classification**: To isolate and identify the underlying meteorological and anthropogenic drivers behind high-severity fire events (the top 20% of largest historical fires).
 
 ## Tools & technologies   
 The technical framework of this thesis is built entirely within the R ecosystem, leveraging its advanced capabilities for spatial data analysis, statistical modelling, and interactive storytelling:
